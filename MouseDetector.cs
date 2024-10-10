@@ -5,8 +5,8 @@ using UnityEngine.EventSystems;
 
 public class MouseDetector : MonoBehaviour
 {
-    public GameControl gameControlScript;
-
+    [SerializeField] private GameControl gameControlScript;
+    [SerializeField] private RotationArrowControl rotationArrowControlScript;
     private Ray ray;
     private RaycastHit hit;
     private string lastRayCastHitObjectName;
@@ -24,8 +24,7 @@ public class MouseDetector : MonoBehaviour
         lastRayCastHitObjectName = "none";
     }
 
-    void Update()
-    {
+    void Update(){
         ray = Camera.main.ScreenPointToRay(Input.mousePosition);
         if (Physics.Raycast(ray, out hit))
         {
@@ -65,8 +64,7 @@ public class MouseDetector : MonoBehaviour
                 }//clicked
             }//mouse is not over UI item 
         }//raycast hit (mouse hovering)
-        else
-        {
+        else{
             NonArrowHover();
         }//no raycast hit
 
@@ -77,21 +75,18 @@ public class MouseDetector : MonoBehaviour
      * CUSTOM METHODS *
      ******************/
 
-    private void ArrowHover()
-    {
+    private void ArrowHover(){
         //if this is a different arrow we are hovering over now, turn off the old one first. 
         if (hit.collider.gameObject != highlightedArrow)
             NonArrowHover();
 
         highlightedArrow = hit.collider.gameObject;
-        gameControlScript.SetRotationArrowHighlighting(true, highlightedArrow);
+        rotationArrowControlScript.SetHighlighting(true, highlightedArrow);
     }
 
-    private void NonArrowHover()
-    {
-        if (highlightedArrow != null)
-        {
-            gameControlScript.SetRotationArrowHighlighting(false, highlightedArrow);
+    private void NonArrowHover(){
+        if (highlightedArrow != null){
+            rotationArrowControlScript.SetHighlighting(false, highlightedArrow);
             highlightedArrow = null;
         }
 

@@ -4,7 +4,7 @@ using UnityEngine;
 
 public class DiceController : MonoBehaviour
 {
-    public GameControl gameControlScript;
+    public DieSpawner dieSpawnerScript;
     public AudioSource dieAudioSource;
     public AudioClip dieColliderSound;
     private Rigidbody dieRigidBody;
@@ -22,7 +22,7 @@ public class DiceController : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
-        gameControlScript = GameObject.FindGameObjectWithTag("GameControl").GetComponent<GameControl>();
+        dieSpawnerScript = GameObject.FindGameObjectWithTag("DiceControl").GetComponent<DieSpawner>();
         groundTransform = GameObject.FindGameObjectWithTag("Ground").transform;
         dieRigidBody = gameObject.GetComponent<Rigidbody>();
         inMotion = true;
@@ -35,42 +35,41 @@ public class DiceController : MonoBehaviour
         if (dieRigidBody.IsSleeping() && activeDie)
         {
             //find out which side faces up and report it back to the game controller 
-            string face = GetRollResult();
-            if (face != "Error")
+
+            string result = GetRollResult();
+            int particleEffectIndex = 0;
+            switch (result)
             {
-                activeDie = false;
-                gameControlScript.DiceRollReport(face);
-                if (face == "Panic")
-                {
-                    //ensure that the particle system is facing up before activating it. 
-                    transform.GetChild(0).transform.rotation = Quaternion.LookRotation(Vector3.up, Vector3.forward);
-                    transform.GetChild(0).GetComponent<ParticleSystem>().Play();
-                }
-                else if (face == "Arrow")
-                {
-                    //ensure that the particle system is facing up before activating it. 
-                    transform.GetChild(1).transform.rotation = Quaternion.LookRotation(Vector3.up, Vector3.forward);
-                    transform.GetChild(1).GetComponent<ParticleSystem>().Play();
-                }
-                else if (face == "Axe")
-                {
-                    //ensure that the particle system is facing up before activating it. 
-                    transform.GetChild(2).transform.rotation = Quaternion.LookRotation(Vector3.up, Vector3.forward);
-                    transform.GetChild(2).GetComponent<ParticleSystem>().Play();
-                }
+                case "Error":   //die not settled yet
+                    ConsolePrint("Nudging..");
+                    int nudgeMagnitude = 100;
+                    gameObject.GetComponent<Rigidbody>().AddTorque(transform.up * Random.Range(-nudgeMagnitude, nudgeMagnitude) + transform.right * Random.Range(-nudgeMagnitude, nudgeMagnitude) + transform.forward * Random.Range(-nudgeMagnitude, nudgeMagnitude));
+                    break;
+                case "Panic":
+                    activeDie = false;
+                    particleEffectIndex = 0;
+                    break;
+                case "Arrow":
+                    activeDie = false;
+                    particleEffectIndex = 1;
+                    break;
+                case "Axe":
+                    activeDie = false;
+                    particleEffectIndex = 2;
+                    break;
             }
-            else
-            {
-                ConsolePrint("Nudging..");
-                int nudgeMagnitude = 100;
-                gameObject.GetComponent<Rigidbody>().AddTorque(transform.up * Random.Range(-nudgeMagnitude, nudgeMagnitude) + transform.right * Random.Range(-nudgeMagnitude, nudgeMagnitude) + transform.forward * Random.Range(-nudgeMagnitude, nudgeMagnitude));
+
+            if (!activeDie){
+                //die has settled, report result and play particle effect
+                dieSpawnerScript.DieRollReport(result);
+                transform.GetChild(particleEffectIndex).transform.rotation = Quaternion.LookRotation(Vector3.up, Vector3.forward);
+                transform.GetChild(particleEffectIndex).GetComponent<ParticleSystem>().Play();
             }
         }//if sleeping, but was previously active
 
     }//update
 
-    private void OnCollisionEnter(Collision collision)
-    {
+    private void OnCollisionEnter(Collision collision)    {
         dieAudioSource.PlayOneShot(dieColliderSound);
     }
 

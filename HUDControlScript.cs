@@ -107,7 +107,7 @@ public class HUDControlScript : MonoBehaviour
      * CUSTOM METHODS *
      ******************/
 
-    public void InitializeSquadPlacementUI( string gameMode, int playerID )
+    public void InitializeSquadPlacementUI( int playerID )
     {
 
         //enable/show the panel for squad placement. 
@@ -117,7 +117,7 @@ public class HUDControlScript : MonoBehaviour
         squadPlacementPanel.transform.GetChild(0).GetComponent<TMPro.TextMeshProUGUI>().text = GameSettings.playerNames[playerID];
 
         //enable/disable widgets on the panel, set squad counts based on game mode 
-        switch (gameMode)
+        switch (GameSettings.gameMode)
         {
             case "Standard":
                 kingCountMax = 1;
@@ -361,7 +361,7 @@ public class HUDControlScript : MonoBehaviour
         selectedSquadType = "King";
         selectedSquadSize = 1;
         AddSquadButtonPressed();
-        gameControlScript.SquadToPlaceFromUI(GameSettings.king1PrefabAddress);
+        gameControlScript.DefineSquadToPlaceFromUI(GameSettings.king1PrefabAddress);
     }
 
     public void AddKnightClicked()
@@ -369,7 +369,7 @@ public class HUDControlScript : MonoBehaviour
         selectedSquadType = "Knight";
         selectedSquadSize = 2;
         AddSquadButtonPressed();
-        gameControlScript.SquadToPlaceFromUI(GameSettings.knight2PrefabAddress);
+        gameControlScript.DefineSquadToPlaceFromUI(GameSettings.knight2PrefabAddress);
     }
 
     public void AddInfantryClicked()
@@ -377,7 +377,7 @@ public class HUDControlScript : MonoBehaviour
         selectedSquadType = "Infantry";
         selectedSquadSize = 4;
         AddSquadButtonPressed();
-        gameControlScript.SquadToPlaceFromUI(GameSettings.infantry4PrefabAddress);
+        gameControlScript.DefineSquadToPlaceFromUI(GameSettings.infantry4PrefabAddress);
     }
 
     public void AddArcherClicked()
@@ -385,7 +385,7 @@ public class HUDControlScript : MonoBehaviour
         selectedSquadType = "Archer";
         selectedSquadSize = 4;
         AddSquadButtonPressed();
-        gameControlScript.SquadToPlaceFromUI(GameSettings.archer4PrefabAddress);
+        gameControlScript.DefineSquadToPlaceFromUI(GameSettings.archer4PrefabAddress);
     }
 
     public void AddHeavyInfantryClicked()
@@ -393,7 +393,7 @@ public class HUDControlScript : MonoBehaviour
         selectedSquadType = "HeavyInfantry";
         selectedSquadSize = 2;
         AddSquadButtonPressed();
-        gameControlScript.SquadToPlaceFromUI(GameSettings.heavyInfantry2PrefabAddress);
+        gameControlScript.DefineSquadToPlaceFromUI(GameSettings.heavyInfantry2PrefabAddress);
     }
 
     public void AddMercenaryClicked()
@@ -401,7 +401,7 @@ public class HUDControlScript : MonoBehaviour
         selectedSquadType = "Mercenary";
         selectedSquadSize = 2;
         AddSquadButtonPressed();
-        gameControlScript.SquadToPlaceFromUI(GameSettings.mercenary2PrefabAddress);
+        gameControlScript.DefineSquadToPlaceFromUI(GameSettings.mercenary2PrefabAddress);
     }
 
     public void AddPeasantClicked()
@@ -409,7 +409,7 @@ public class HUDControlScript : MonoBehaviour
         selectedSquadType = "Peasant";
         selectedSquadSize = 4;
         AddSquadButtonPressed();
-        gameControlScript.SquadToPlaceFromUI(GameSettings.peasant4PrefabAddress);
+        gameControlScript.DefineSquadToPlaceFromUI(GameSettings.peasant4PrefabAddress);
     }
 
     public void PlacementCompleteClicked()

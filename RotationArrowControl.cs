@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class RotationArrowControlScript : MonoBehaviour{
+public class RotationArrowControl : MonoBehaviour{
     public GameObject leftArrow;
     public GameObject rightArrow;
     public GameObject mainCamera;

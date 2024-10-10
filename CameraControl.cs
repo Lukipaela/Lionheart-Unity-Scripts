@@ -2,8 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class CameraControl : MonoBehaviour
-{
+public class CameraControl : MonoBehaviour {
     public GameObject[] diceRollCameraLocations;
     public GameObject[] activeGameCameraLocations;
     public GameObject[] playerOneSetupCameraLocations;
@@ -12,7 +11,7 @@ public class CameraControl : MonoBehaviour
     public GameObject castleFront;
     public GameControl gameControlScript;
     public GameObject combatCameraBox;
-
+    public bool animating = false;
     public bool combatCameraActive = false;
 
     private readonly int diceCamLocationCount = 4;
@@ -24,7 +23,6 @@ public class CameraControl : MonoBehaviour
     private readonly float cameraMoveSpeed = 2;
     private readonly float cameraRotationSpeed = 2;
     private GameObject targetCamLocation;
-    private bool animating = false;
     private GameObject cameraTrackedObject = null;
     private float cameraZoom_combat = 1;
     private float cameraZoom_default = 3.5f;
@@ -35,17 +33,15 @@ public class CameraControl : MonoBehaviour
     /********************
      * BUILT-IN METHODS *
      ********************/
-     
-    void Start()
-    {
+
+    void Start() {
         gamePhase = "DiceRoll";
         currentLocationIndex = 0;
         targetCamLocation = diceRollCameraLocations[currentLocationIndex];
     }
-    
-    void Update()
-    {
-        if(animating)
+
+    void Update() {
+        if (animating)
             MoveCamera();
     }//update
 
@@ -54,30 +50,22 @@ public class CameraControl : MonoBehaviour
      * CUSTOM METHODS *
      ******************/
 
-    private void MoveCamera()
-    {
-        if (!combatCameraActive)
-        {
+    private void MoveCamera() {
+        if (!combatCameraActive) {
             ConsolePrint("Non Combat Camera Update");
             //standard camera rules of motion
-            if (Vector3.Angle(mainCamera.transform.forward, targetCamLocation.transform.forward) > 0.5f || Vector3.Distance(mainCamera.transform.position, targetCamLocation.transform.position) > 0.5)
-            {
+            if (Vector3.Angle(mainCamera.transform.forward, targetCamLocation.transform.forward) > 0.5f || Vector3.Distance(mainCamera.transform.position, targetCamLocation.transform.position) > 0.5) {
                 mainCamera.transform.rotation = Quaternion.Lerp(mainCamera.transform.rotation, targetCamLocation.transform.rotation, Time.deltaTime * cameraRotationSpeed);
                 mainCamera.transform.position = Vector3.Lerp(mainCamera.transform.position, targetCamLocation.transform.position, cameraMoveSpeed * Time.deltaTime);
             }
             else
-            {
                 animating = false;
-                gameControlScript.ReportCameraAnimationComplete();
-            }
         }
     }//move camera
 
-    public void MoveToNextLocation()
-    {
+    public void MoveToNextLocation() {
         ConsolePrint("Cam location toggle command received, cycling to next " + gamePhase + " location");
-        switch (gamePhase)
-        {
+        switch (gamePhase) {
             case "PlayerOneSetup":
                 currentLocationIndex = (currentLocationIndex + 1) % p1SetupCamLocationCount;
                 targetCamLocation = playerOneSetupCameraLocations[currentLocationIndex];
@@ -99,8 +87,7 @@ public class CameraControl : MonoBehaviour
         animating = true;
     }//move to next location
 
-    public void SetCameraGamePhase( string phase )
-    {
+    public void SetCameraGamePhase(string phase) {
         ConsolePrint("Cam game phase changed to " + phase);
         if (phase == "DiceRoll")
             castleFront.SetActive(false);
@@ -112,8 +99,7 @@ public class CameraControl : MonoBehaviour
         MoveToNextLocation();
     }   //set camera game phase
 
-    public void EnableCombatCamera( GameObject focalObject )
-    {
+    public void EnableCombatCamera(GameObject focalObject) {
         ConsolePrint("Enabling combat camera with target " + focalObject.name);
         //this method switches the camera to perspective mode and moves it to the location of the active combatant
         combatCameraActive = true;
@@ -130,23 +116,18 @@ public class CameraControl : MonoBehaviour
         mainCamera.transform.rotation = combatCameraBox.transform.GetChild(0).transform.rotation;
 
         Quaternion angleToTarget = Quaternion.LookRotation((cameraTrackedObject.transform.position + (cameraTrackedObject.transform.forward * 0.1f) + (cameraTrackedObject.transform.up * 0.6f)) - mainCamera.transform.position);
-        mainCamera.transform.rotation = angleToTarget;// Quaternion.Slerp(transform.rotation, angleToTarget, Time.deltaTime);
+        mainCamera.transform.rotation = angleToTarget;
 
-        //toggle to perspective mode
-        //mainCamera.GetComponent<Camera>().orthographic = false;
-        //zoom camera instead
+        //zoom camera in on action 
         mainCamera.GetComponent<Camera>().orthographicSize = cameraZoom_combat;
     }//enable combat camera 
 
-    public void DisableCombatCamera()
-    {
+    public void DisableCombatCamera() {
         //this method switches the camera back to ortho mode and moves it to the active game camera location 
         combatCameraActive = false;
         animating = false;
 
-        //return camera to ortho perspective
-        //mainCamera.GetComponent<Camera>().orthographic = true;
-        //zoom camera instead
+        //return camera to standard zoom
         mainCamera.GetComponent<Camera>().orthographicSize = cameraZoom_default;
 
         //return camera position to active game camera position
@@ -163,15 +144,12 @@ public class CameraControl : MonoBehaviour
      * DEBUG STUFF *
      ***************/
 
-    public void ToggleCameraProjection()
-    {
+    public void ToggleCameraProjection() {
         mainCamera.GetComponent<Camera>().orthographic = !mainCamera.GetComponent<Camera>().orthographic;
     }
 
-    public void ConsolePrint(string message)
-    {
-        if (enableDebugging == true)
-        {
+    public void ConsolePrint(string message) {
+        if (enableDebugging == true) {
             Debug.Log("Camera Control - " + message);
         }
     }//console print

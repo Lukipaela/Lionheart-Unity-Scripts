@@ -6,28 +6,24 @@ public class SquadScript : MonoBehaviour {
     public int ownerID;    //which player owns this squad 
     public int orientationIndex;   //corresponds to the orientations array in GameSettings. Indicates which direction this squad is facing
     public GameObject occupiedGameTile; //the tile which this unit is currently standing on 
-
     public SoldierClassData soldierClassData;
-    public GameControl gameControlScript;
+    public int unitsRemaining;
+
+    [SerializeField] private GameControl gameControlScript;
     private bool isSelected = false;
     private bool isBlocking = false; //indicates if the most recent animation requested was a block. Allows troops to rotate toward enemy and back again after surviving
-
     //animation controls
     private bool isRotating = false;
     private bool isMoving = false;
-    private bool squadTileIsAnimating = false;
-    private bool unitsAreAnimating = false;
-    private int activeUnitAnimations = 0;   //tracks how many units are still animating 
     private float rotationSpeed = 2.3f;  //holds the actual value used in animation, written to by one of the below constants
     private float movementSpeed = 1.3f;  //holds the actual value used in animation, written to by one of the below constants
     private readonly float setupRotationSpeed = 8;
     private readonly float activeGameRotationSpeed = 2.2f;
     private readonly float setupMovementSpeed = 5;
     private readonly float activeGameMovementSpeed = 1.5f;
-    private Vector3 rotationTargetVector;
-    private Vector3 movementTargetVector;
-    private List<AnimationTask> animationQueue;
+    private List<AnimationTask> animationQueue = new List<AnimationTask>();
     private AnimationTask currentAnimationTask; //holds the details of whichever animation task is currently active
+    private List<UnitScript> unitList = new List<UnitScript>();
 
     //debug
     private static readonly bool enableDebugging = true;
@@ -38,65 +34,44 @@ public class SquadScript : MonoBehaviour {
      ********************/
 
     void Start() {
-        animationQueue = new List<AnimationTask>();
         gameControlScript = GameObject.FindGameObjectWithTag("GameControl").GetComponent<GameControl>();
     }
 
     void Update() {
         if (isRotating) {
-            RotationFrameUpdate(gameObject, rotationTargetVector);
+            RotationFrameUpdate(gameObject, currentAnimationTask.targetVector);
         }//rotating logic
 
         if (isMoving) {
             MovementFrameUpdate(gameObject, currentAnimationTask.targetVector);
         }//moving logic
 
-        if (!isMoving && !isRotating && !unitsAreAnimating) {
+        if (!isMoving && !isRotating && !AreUnitsAnimating()) {
             CheckAnimationQueue();
         }//no longer animating
     }//Update 
 
 
-    /******************
-     * CUSTOM METHODS *
-     ******************/
 
-    public void DefineSquad(int ownerID, string squadType, int unitsInSquad, string facingDirection, GameObject location) {
-        //called after instantiation, to initialize the tile's parameters (type, count, etc)
-        this.ownerID = ownerID;
-        soldierClassData.unitClass = squadType;
-
-        //all squads are initially placed facing one of two directions, then can later be rotated if desired. 
-        if (facingDirection == "Left")
-            orientationIndex = 3;
-        else
-            orientationIndex = 1;
-
-        occupiedGameTile = location;
-        soldierClassData.InitializeSquad(squadType, unitsInSquad);
-    }
+    /*****************
+     * DAMAGE / LOSS *
+     *****************/
 
     public void TakeDamage(int damage) {
-        //total up units lost, requiring 2 damage to kill a large unit,and clamping to a max of UnitsInSquad
-        int unitsLost = Mathf.Min(damage / soldierClassData.healthPerUnit, soldierClassData.unitsInSquad);
-        soldierClassData.unitsInSquad -= unitsLost;
-
-        if (unitsLost > 0)
-            gameControlScript.ReportAnimationStart("Squad death animations beginning for - Team " + ownerID + ", " + gameObject.name);
-
-        GameObject[] unitsKilled = new GameObject[4];   //max of 4 units can be killed in a single attack TODO: UPDATE THIS FOR MASSIVE ARMY MODE
-        //loop over units in squad for unitsLost iterations and kill one per iteration
-        for (int i = 0; i < unitsLost; i++) {
-            unitsKilled[i] = transform.GetChild(i + 1).gameObject;//offset index by 1, as child 0 is the base, not a unit
+        //total up units lost, requiring 2 damage to kill a large unit, and clamping to a max of UnitsInSquad
+        int unitsLost = Mathf.Min(damage / soldierClassData.healthPerUnit, unitsRemaining);
+        unitsRemaining -= unitsLost;
+        
+        for (int i = 0; i < unitList.Count; i++) {
+            if(i < unitsLost)
+                unitList[i].Die();  //Call directly, unit is halted in block animation and not reading its queue
+            else
+                unitList[i].Deflect(); //Call directly, unit is halted in block animation and not reading its queue
         }
 
-        //TODO: retool this to call the block particle effect on each survivor
-        foreach (GameObject unit in unitsKilled) {
-            if (unit != null)
-                unit.GetComponent<UnitScript>().AddAnimationToQueue("Die", Vector3.one);
-        }
+        unitList.RemoveRange(0, unitsLost);
 
-        if (soldierClassData.unitsInSquad == 0)
+        if (unitsRemaining == 0)
             SquadLost();
     }//TakeDamage
 
@@ -107,20 +82,13 @@ public class SquadScript : MonoBehaviour {
     }//squad lost
 
 
+
     /*************
      * ANIMATION *
      *************/
 
     private void CheckAnimationQueue() {
-        // if not currently doing anything, check the animation queue for a new action. 
         if (animationQueue.Count > 0) {
-            //ConsolePrint("Pulling task from animation queue with SquadTileIsAnimating = " + squadTileIsAnimating + ", and activeUnitAnimations = " + activeUnitAnimations);
-            if (!squadTileIsAnimating && activeUnitAnimations == 0) {
-                ConsolePrint("Check Animation Queue startup logic hit.");
-                gameControlScript.ReportAnimationStart("Beginning animation queue from squad - Team " + ownerID + ", " + gameObject.name);
-                squadTileIsAnimating = true;
-            }
-
             currentAnimationTask = animationQueue[0];
             animationQueue.RemoveAt(0);
             ConsolePrint("Moving to animation: " + currentAnimationTask.animationType);
@@ -128,100 +96,86 @@ public class SquadScript : MonoBehaviour {
                 case "Block":
                     //rotate towards attacker, then block
                     isBlocking = true;
-                    AnimateSquad(soldierClassData.unitsInSquad, "Rotate", currentAnimationTask.targetVector);
-                    AnimateSquad(soldierClassData.unitsInSquad, "Block", Vector3.one);
+                    AnimateSquad(-1, "Rotate", currentAnimationTask.targetVector);
+                    AnimateSquad(-1, "Block", Vector3.one);
                     break;
 
                 case "Cheer":
-                    AnimateSquad(soldierClassData.unitsInSquad, "Cheer", Vector3.one);
+                    AnimateSquad(-1, "Cheer", Vector3.one);
+                    AnimateSquad(-1, "Idle", Vector3.one);
                     break;
 
                 case "Die":
-                    AnimateSquad(soldierClassData.unitsInSquad, "Die", Vector3.one);
+                    AnimateSquad(-1, "Die", Vector3.one);
+                    SquadLost();
                     break;
 
                 case "Idle":
                     if (isBlocking) {
                         //if we were blocking before, rotate back forwards before going to idle
                         isBlocking = false;
-                        AnimateSquad(soldierClassData.unitsInSquad, "Rotate", transform.forward);
+                        AnimateSquad(-1, "Rotate", transform.forward);
                     }
-                    AnimateSquad(soldierClassData.unitsInSquad, "Idle", Vector3.one);
+                    AnimateSquad(-1, "Idle", Vector3.one);
                     break;
 
                 case "MoveSquad":
                     isMoving = true;
-                    movementTargetVector = currentAnimationTask.targetVector;
-                    AnimateSquad(soldierClassData.unitsInSquad, "March", Vector3.one);
+                    AnimateSquad(-1, "March", Vector3.one);
                     break;
 
                 case "RotateSquad":
                     isRotating = true;
-                    rotationTargetVector = currentAnimationTask.targetVector;
                     break;
 
                 case "RotateUnits":
-                    AnimateSquad(soldierClassData.unitsInSquad, "Rotate", currentAnimationTask.targetVector);
+                    AnimateSquad(-1, "Rotate", currentAnimationTask.targetVector);
                     break;
 
                 case "SqaudAttack":
                     GenerateAttackAnimationQueue(currentAnimationTask);
                     break;
 
-                case "SquadLost":
-                    //short circuit the animation completion message, as this unit is about to be destroyed
-                    gameControlScript.ReportSquadElimenated(gameObject);
-                    gameControlScript.ReportAnimationComplete("Team " + ownerID + ", " + gameObject.name + " - Squad Lost animation task");
-                    break;
-
             }//animation type switch 
         }//animations remain in queue
-        else if (squadTileIsAnimating) {
-            squadTileIsAnimating = false;
-            if (activeUnitAnimations == 0)
-                gameControlScript.ReportAnimationComplete("Team " + ownerID + ", " + gameObject.name + " - End of animation queue");
-        }
     }//check animation queue
 
     private void RotationFrameUpdate(GameObject rotatingObject, Vector3 desiredForwardVector) {
+        // Rotate the forward vector towards the target direction by one step
+        Vector3 newDirection = Vector3.RotateTowards(rotatingObject.transform.forward, desiredForwardVector, rotationSpeed * Time.deltaTime, 0.0f);
+        // Calculate a rotation a step closer to the target and applies rotation to this object
+        rotatingObject.transform.rotation = Quaternion.LookRotation(newDirection);
+
         //if we have reached our target orientation, stop rotating.
         if (Vector3.Angle(rotatingObject.transform.forward, desiredForwardVector) < 1) {
             isRotating = false;
-            //pre-emptively mark units as animating, as we are about to issue them a command which may take a frame to activate
-            unitsAreAnimating = true;
-            AnimateSquad(soldierClassData.unitsInSquad, "Idle", Vector3.one);
-        }
-        else {
-            // Rotate the forward vector towards the target direction by one step
-            Vector3 newDirection = Vector3.RotateTowards(rotatingObject.transform.forward, desiredForwardVector, rotationSpeed * Time.deltaTime, 0.0f);
-            // Calculate a rotation a step closer to the target and applies rotation to this object
-            rotatingObject.transform.rotation = Quaternion.LookRotation(newDirection);
+            HaltUnits();
         }
 
     }//RotationFrameUpdate
 
     private void MovementFrameUpdate(GameObject movingObject, Vector3 desiredLocation) {
         movingObject.transform.position = Vector3.MoveTowards(movingObject.transform.position, desiredLocation, movementSpeed * Time.deltaTime);
+        
+        //if we have reached our destination, stop moving
         if (movingObject.transform.position == desiredLocation) {
             isMoving = false;
-            occupiedGameTile.GetComponent<BoardTileScript>().PlaceSquad(gameObject);
-            unitsAreAnimating = true;
-            AnimateSquad(soldierClassData.unitsInSquad, "Idle", Vector3.one);
+            if (occupiedGameTile != null)
+                occupiedGameTile.GetComponent<BoardTileScript>().PlaceSquad(gameObject);  
+            HaltUnits();
         }//done moving
     } //MovementFrameUpdate
 
     private void GenerateAttackAnimationQueue(AnimationTask currentAnimationTask) {
         ConsolePrint(gameObject.name + " Generating attack animation queue.");
         //init local variables
-        UnitScript[] unitControlScriptArray;
         switch (soldierClassData.unitClass) {
             case "Infantry":
             case "Knight":
             case "Peasant":
             case "Mercenary":
                 Vector3 positionDelta = currentAnimationTask.targetVector - transform.position;
-                unitControlScriptArray = gameObject.GetComponentsInChildren<UnitScript>();
-                foreach (UnitScript thisUnitScript in unitControlScriptArray) {
+                foreach (UnitScript thisUnitScript in unitList) {
                     float walkDistance = 0.85f;
                     if (soldierClassData.unitClass == "Knight")
                         walkDistance = 0.35f;
@@ -247,9 +201,7 @@ public class SquadScript : MonoBehaviour {
             case "Archer":
             case "King":
                 Vector3 angleToTarget = currentAnimationTask.targetVector - transform.position;
-
-                unitControlScriptArray = gameObject.GetComponentsInChildren<UnitScript>();
-                foreach (UnitScript thisUnitScript in unitControlScriptArray) {
+                foreach (UnitScript thisUnitScript in unitList) {
                     //walk forward to the target's tile, maintaining formation
                     thisUnitScript.AddAnimationToQueue("Rotate", angleToTarget);
                     //animate the attack
@@ -260,22 +212,32 @@ public class SquadScript : MonoBehaviour {
                     thisUnitScript.AddAnimationToQueue("Idle", Vector3.one);
                 }
                 break;
-
         }//switch squadtype
-
     }//GenerateAttackAnimationQueue
 
-    public void AnimateSquad(int soldierCount, string animationType, Vector3 animationVector) {
-        ConsolePrint("Animation " + animationType + " requested for " + soldierCount + " units of type " + soldierClassData.unitClass);
-        UnitScript[] unitControlScriptArray = gameObject.GetComponentsInChildren<UnitScript>();
+    public void AnimateSquad(int soldiersToAnimate, string animationType, Vector3 animationVector) {
+        ConsolePrint("Animation " + animationType + " requested for " + soldiersToAnimate + " units of type " + soldierClassData.unitClass);
 
-        if (soldierCount == -1) //default used to mean "all units do this animation"
-            soldierCount = unitControlScriptArray.Length;
+        if (soldiersToAnimate == -1) //default used to mean "all units do this animation"
+            soldiersToAnimate = unitList.Count;
 
-        for (int i = 0; i < soldierCount; i++) {
-            unitControlScriptArray[i].AddAnimationToQueue(animationType, animationVector);
+        for (int i = 0; i < soldiersToAnimate && i < unitList.Count; i++) {
+            unitList[i].AddAnimationToQueue(animationType, animationVector);
         }
     }//AnimateSquad
+
+    /// <summary>
+    /// Relinquish the current tile from this squad's ownbership, and move the squadf forward a bit,
+    /// then die. Note - does not rely on there being a board tile ahead.
+    /// </summary>
+    private void PanicDeath( Vector3 marchVector ) {
+        ConsolePrint("Panic death triggered");
+        occupiedGameTile.GetComponent<BoardTileScript>().ClearTile();
+        occupiedGameTile = null;
+        animationQueue.Add(new AnimationTask("MoveSquad", transform.position + (marchVector.normalized * 1.1f)));
+        animationQueue.Add(new AnimationTask("Die", Vector3.one));
+    }
+
 
 
     /*******************
@@ -502,73 +464,103 @@ public class SquadScript : MonoBehaviour {
     } //assess movable
 
 
+
     /****************
      * GAME ACTIONS *
      ****************/
 
     public void Attack(GameObject attackTarget) {
         ConsolePrint("Squad attacking");
-        //add animation to the queue 
-        AnimationTask thisAnimationTask = new AnimationTask("SqaudAttack", attackTarget.transform.position);
-        animationQueue.Add(thisAnimationTask);
-
+        animationQueue.Add(new AnimationTask("SqaudAttack", attackTarget.transform.position));
     }//attack
 
-    public void Panic(int distance, int retreatDirection) {
-        ConsolePrint("Squad panicking");
-        // Determine the rotation needed to align this squad with the retreatr vector - always run the direction the attacker is facing.
-        int netRotation = retreatDirection - orientationIndex;
-        if (Mathf.Abs(netRotation) == 3)
-            netRotation = netRotation / -3;
-        for (int i = 0; i < Mathf.Abs(netRotation); i++) {
-            if (netRotation > 0)
-                RotateSquad("Right");
-            else
-                RotateSquad("Left");
-        }
-
-        //calculate the next target tile
-        BoardTileScript nextTileScript;
-        for (int i = 0; i < distance; i++) {
-            nextTileScript = ScanNextTile(occupiedGameTile.GetComponent<BoardTileScript>(), orientationIndex);
-            if (nextTileScript == null) {
-                SquadLost();
-                break;
+    /// <summary>
+    /// Called by the ghame control when this unit has been told to panic. 
+    /// Will do nothing if the unit class does not panic. 
+    /// Can invoke a chain reaction if it runs into another unit. 
+    /// </summary>
+    /// <param name="distance">How many tiles to try to retreat.</param>
+    /// <param name="distance">The orientation index along which the retreat should be performed.</param>
+    public IEnumerator Panic(int distance, int retreatDirection) {
+        ConsolePrint("Squad panicking along orientation index " + retreatDirection + ". Can receive panic: " + soldierClassData.canReceivePanic);
+        //if this class of soldier cannot be made to panic, return that value to the caller and perform no followup actions
+        if (soldierClassData.canReceivePanic) {
+            //In case this animation was triggered by this unit's own attacks (peasant), wait for current animations to conclude before proceeding.
+            while(IsTheSquadAnimating()) {
+                yield return new WaitForSeconds(0.1f);
             }
-            else {
-                //check if it is occupied
-                if (nextTileScript.isOccupied) {
-                    string occupyingSquadType = nextTileScript.occupyingSquad.GetComponent<SquadScript>().soldierClassData.unitClass;
-                    if (occupyingSquadType == "King" || occupyingSquadType == "Mercenary" || nextTileScript.occupyingSquad.GetComponent<SquadScript>().ownerID != this.ownerID) {
-                        SquadLost();
-                        break;
-                    }
-                    else
-                        StartCoroutine(DelayThenPanic(nextTileScript.occupyingSquad.GetComponent<SquadScript>(), retreatDirection));
-                }//next tile is occupied
-                MoveLocation(nextTileScript.gameObject);
-            }//next tile exists
-        }//loop
 
+            // Determine the rotation needed to align this squad with the retreat vector 
+            int netRotation = retreatDirection - orientationIndex;
+            if (Mathf.Abs(netRotation) == 3)
+                netRotation = netRotation / -3;
+            for (int i = 0; i < Mathf.Abs(netRotation); i++) {
+                if (netRotation > 0)
+                    RotateSquad("Right");
+                else
+                    RotateSquad("Left");
+            }
+            while (IsTheSquadAnimating()) {
+                yield return new WaitForSeconds(0.1f);
+            }
+
+            //do panic animation, including suicide or panicking the next guy over
+            BoardTileScript nextTileScript;
+            for (int i = 0; i < distance; i++) {
+                nextTileScript = ScanNextTile(occupiedGameTile.GetComponent<BoardTileScript>(), orientationIndex);
+                if (nextTileScript == null) {
+                    ConsolePrint("Edge of board detected, invoking panic death");
+                    PanicDeath(GameSettings.orientations[retreatDirection]);
+                    break;
+                }
+                else if (nextTileScript.isOccupied) {
+                    SquadScript occupyingSquadScript = nextTileScript.occupyingSquad.GetComponent<SquadScript>();
+                    if (occupyingSquadScript.ownerID != this.ownerID || !occupyingSquadScript.soldierClassData.canReceivePanic) {
+                        ConsolePrint("Next tile can't be panicked, invoking panic death");
+                        PanicDeath(GameSettings.orientations[retreatDirection]);
+                    }
+                    else {//invoke panic on the next unit, and wait for the tile to be released before moving into it. 
+                        ConsolePrint("Beginning panic chain.");
+                        StartCoroutine(occupyingSquadScript.Panic(distance: 1, retreatDirection));
+                        while (nextTileScript.isOccupied) {
+                            yield return new WaitForSeconds(0.1f);
+                        }
+                        MoveLocation(nextTileScript.gameObject);
+                        while (IsTheSquadAnimating()) {
+                            yield return new WaitForSeconds(0.1f);
+                        }
+                    }//next tile occupied by something I can push out                   
+                }//next tile is occupied
+                else { //next tile is unoccupied, move in and continue to panic if applicable
+                    ConsolePrint("Next tile open, performing unimpeded panic movement.");
+                    MoveLocation(nextTileScript.gameObject);
+                    while (IsTheSquadAnimating()) {
+                        yield return new WaitForSeconds(0.1f);
+                    }
+                }//retreating to empty tile
+                //wait between iterations of the retreat loop to allow the chain reaction to flow to the end of the line first. 
+                yield return new WaitForSeconds(1);
+            }//loop
+        }// this unit type can panic
+        yield return new WaitForSeconds(0); //dummy return value when no delay is needed - happens when this unit cannot panic
     }//panic
 
     public void MoveLocation(GameObject newBoardTile) {
         //clear the previous tile
         occupiedGameTile.GetComponent<BoardTileScript>().ClearTile();
 
+        ConsolePrint("Vector to next tile is: " + (newBoardTile.transform.position - occupiedGameTile.transform.position).ToString());
+
         //designate the new target as occupied
         occupiedGameTile = newBoardTile;
 
         //set up motion speeds 
-        string gamePhase = gameControlScript.gamePhase;
-        if (gamePhase == "PlaceArmyP1" || gamePhase == "PlaceArmyP2")
+        if (gameControlScript.gamePhase == "PlaceArmyP1" || gameControlScript.gamePhase == "PlaceArmyP2")
             movementSpeed = setupMovementSpeed;
         else
             movementSpeed = activeGameMovementSpeed;
 
-        //add animation to the queue 
-        AnimationTask thisAnimationTask = new AnimationTask("MoveSquad", occupiedGameTile.transform.position);
-        animationQueue.Add(thisAnimationTask);
+        animationQueue.Add(new AnimationTask("MoveSquad", occupiedGameTile.transform.position)); 
     }//move Location
 
     public void RotateSquad(string direction) {
@@ -580,25 +572,21 @@ public class SquadScript : MonoBehaviour {
             orientationIndex = (orientationIndex + 1) % 4;
 
         //determine target vector
-        rotationTargetVector = GameSettings.orientations[orientationIndex];
+        Vector3 rotationTargetVector = GameSettings.orientations[orientationIndex];
 
-        //set up motion speeds 
-        string gamePhase = gameControlScript.gamePhase;
-        if (gamePhase == "PlaceArmyP1" || gamePhase == "PlaceArmyP2")
+        //set up motion speeds
+        if (gameControlScript.gamePhase == "PlaceArmyP1" || gameControlScript.gamePhase == "PlaceArmyP2")
             rotationSpeed = setupRotationSpeed;
         else
             rotationSpeed = activeGameRotationSpeed;
 
-        //add animation to the queue 
-        AnimationTask thisAnimationTask = new AnimationTask("RotateSquad", rotationTargetVector);
-        animationQueue.Add(thisAnimationTask);
+        animationQueue.Add(new AnimationTask("RotateSquad", rotationTargetVector));
     }//RotateSquad
 
-    private IEnumerator DelayThenPanic(SquadScript targetSquad, int retreatDirection) {
-        yield return new WaitForSeconds(0.3f);
-        targetSquad.Panic(1, retreatDirection);
-    }
-
+    /// <summary>
+    /// Called by the GameControl request that all units in the squad prepare for attack.
+    /// </summary>
+    /// /// <param name="blockDirection">A vector pointing from the squad's center to the center of the attacking squad.</param>
     public void Defend(Vector3 blockDirection) {
         //called when this squad is under attack 
         AnimationTask thisAnimationTask = new AnimationTask("Block", blockDirection);
@@ -607,74 +595,129 @@ public class SquadScript : MonoBehaviour {
 
     public void Idle() {
         //called when an attack on this squad has ended.
-        if (soldierClassData.unitsInSquad > 0) {
-            AnimationTask thisAnimationTask = new AnimationTask("Idle", Vector3.one);
-            animationQueue.Add(thisAnimationTask);
+        if (unitsRemaining > 0) {
+            animationQueue.Add(new AnimationTask("Idle", Vector3.one));
         }
     } //idle
-
+      
+    /// <summary>
+    /// Called by the GameControl to queue a cheer animation.
+    /// </summary>
     public void Cheer() {
         //called at the start of the turn, or at game over for the winner
-        AnimationTask thisAnimationTask = new AnimationTask("Cheer", Vector3.one);
-        animationQueue.Add(thisAnimationTask);
+        animationQueue.Add(new AnimationTask("Cheer", Vector3.one));
     }
+
+    /// <summary>
+    /// Tells all unit scripts to stop their marching animation and go back to Idle after a squad move or squad rotation.
+    /// </summary>
+    private void HaltUnits() {
+        foreach (UnitScript thisUnitScript in unitList)
+            thisUnitScript.MarchEnd();
+    }
+
+    /// <summary>
+    /// Checks if any unit in the squad is currently animating
+    /// </summary>
+    private bool AreUnitsAnimating() {
+        foreach (UnitScript thisUnit in unitList) {
+            if (thisUnit.IsAnimating()) {
+                ConsolePrint(thisUnit.name + " is animating with " + thisUnit.animationState);
+                return true;
+            }
+        }
+        return false;
+
+    }
+
+    /// <summary>
+    /// Checks if the squad has queued animations, OR any of the units is currently animating, or has a queued animation
+    /// </summary>
+    public bool IsTheSquadAnimating() {
+        //check for individual unit animations AND this squad's queue
+        if (AreUnitsAnimating() || animationQueue.Count > 0)
+            return true;
+        else
+            return false;
+    }
+
+
+
+    /*************
+     * UTILITIES *
+     *************/
+
+    public int GetDiceCount() {
+        return unitsRemaining * soldierClassData.dicePerUnit;
+    }//getDiceCount
+
+    public void DefineSquad(int ownerID, string squadType, int unitsInSquad, string facingDirection, GameObject location) {
+        //called after instantiation, to initialize the tile's parameters (type, count, etc)
+        this.ownerID = ownerID;
+        soldierClassData.unitClass = squadType;
+
+        //all squads are initially placed facing one of two directions, then can later be rotated if desired. 
+        if (facingDirection == "Left")
+            orientationIndex = 3;
+        else
+            orientationIndex = 1;
+
+        occupiedGameTile = location;
+        soldierClassData.InitializeSquad(squadType);
+        unitsRemaining = unitsInSquad;
+        //find all units in the squad, put them into a List for future reference
+        UnitScript[] unitControlScriptArray = gameObject.GetComponentsInChildren<UnitScript>();
+        unitList.AddRange(unitControlScriptArray);
+        unitList[unitList.Count - 1].isCaptain = true;  
+    }
+
+
 
     /***********
      * REPORTS *
      ***********/
 
-    public void ReportUnitAnimationStart(string reportData) {
-        //setting the bool is probably redundant here, since we preemptively set it elsewhere, this is a safeguard
-        unitsAreAnimating = true;
-        activeUnitAnimations++;
-        ConsolePrint("Unit animation (" + reportData + ") started. " + activeUnitAnimations + " total unit animations running.");
-    }//report unit animation start
-
-    public void ReportUnitAnimationComplete(string reportData) {
-        activeUnitAnimations--;
-        ConsolePrint("Unit animation (" + reportData + ") ended. " + activeUnitAnimations + " unit animations remaining.");
-        if (activeUnitAnimations == 0) {
-            unitsAreAnimating = false;
-            if (!squadTileIsAnimating)
-                gameControlScript.ReportAnimationComplete("Team " + ownerID + ", " + gameObject.name + " All units reported complete");
-        }
-    }//report unit animation complete
-
-    public void ReportAttackAnimationBeginning() {
-        gameControlScript.ReportAttackAnimationBeginning();
+    /// <summary>
+    /// Passes along a message from a squad member up to the control script to notify the GameController that the attack animation
+    /// has reached the frame where it makes contact with the enemy. The enemy may then react.
+    /// </summary>
+    public void ReportAttackHit() {
+        gameControlScript.ReportAttackHit();
     }
 
-    public void ReportBlockAnimationBeginning() {
-        gameControlScript.ReportBlockAnimationBeginning();
+    /// <summary>
+    /// Passes along a message from a squad member up to the control script to notify the GameController that the Block animation
+    /// has completed and is holding position in the guarding pose. The GameController can now commence attack animations.
+    /// </summary>
+    public void ReportBlockAnimationComplete() {
+        gameControlScript.ReportBlockAnimationComplete();
     }
+
+
 
     /***************
      * DEBUG STUFF *
      ***************/
 
     public void ConsolePrint(string message) {
-        if (enableDebugging == true) {
+        if (enableDebugging == true) 
             Debug.Log("Squad Script - Team " + ownerID + ", " + gameObject.name + ": " + message);
-        }
     }//console print
-
 }//class 
 
 /// <summary>
 /// A struct designed to contain the data relavent to a squad consisting of one or more units of the same type.
 /// </summary>
-/// <param name=""></param>
-/// <returns></returns>
 public struct SoldierClassData {
     public string unitClass;    //Archer, Infantry, Knight, King etc
-    public int unitsInSquad;
     public int apCostToAttack;
     public int apCostToMove;
     public int apCostToRotate;
     public string attacksWith;  //Arrow, Axe, Any(for peasants)
     public int dicePerUnit;
     public int healthPerUnit;
-    public string panicBehavior;   //Standard, AlwaysPanic (Peasants), PanicTargets(Mercenary), NeverPanic(King)
+    public string panicDieAction;   //Standard, AlwaysPanic (Peasants), PanicTargets(Mercenary), NeverPanic(King)
+    public bool canReceivePanic;    // indicates if the unit has to react to having panic inflicted on it (either via an attack from a mercenary, or being run into by a panicking squad)
 
     /// <summary>
     /// Sets up the squad definition based on which troop type is supplied. Uses default tile definition.
@@ -682,10 +725,9 @@ public struct SoldierClassData {
     /// <param name="soldierClass">Infantry, Archer, Knight, King, Mercenary, HeavyInfantry, or Peasant.</param>
     /// <param name="startingUnitCount">How many of this type of soldier should be on in the squad to start the game.</param>
     /// <returns></returns>
-    public void InitializeSquad(string soldierClass, int startingUnitCount) {
+    public void InitializeSquad(string soldierClass) {
         unitClass = soldierClass;
         apCostToRotate = 1;
-        unitsInSquad = startingUnitCount;
         if (soldierClass == "Infantry" || soldierClass == "Archer" || soldierClass == "Peasant") {
             apCostToAttack = 1;
             apCostToMove = 1;
@@ -694,15 +736,12 @@ public struct SoldierClassData {
         }
         else {//knight, king, mercenary, heavyinfantry
             dicePerUnit = 2;
+            apCostToAttack = 1;
 
-            if (soldierClass == "HeavyInfantry") {
-                apCostToAttack = 2;
+            if (soldierClass == "HeavyInfantry") 
                 apCostToMove = 2;
-            }
-            else {
-                apCostToAttack = 1;
+            else 
                 apCostToMove = 1;
-            }
 
             if (soldierClass == "Mercenary")
                 healthPerUnit = 1;
@@ -719,28 +758,31 @@ public struct SoldierClassData {
             attacksWith = "Any";
 
         //define panic types
-        if (soldierClass == "Infantry" || soldierClass == "Archer" || soldierClass == "HeavyInfantry" || soldierClass == "Knight")
-            panicBehavior = "Standard";
-        else if (soldierClass == "Mercenary")
-            panicBehavior = "PanicTargets";
-        else if (soldierClass == "King")
-            panicBehavior = "NeverPanic";
-        else //Peasant
-            panicBehavior = "AlwaysPanic";
+        if (soldierClass == "Infantry" || soldierClass == "Archer" || soldierClass == "HeavyInfantry" || soldierClass == "Knight") {
+            panicDieAction = "Standard";
+            canReceivePanic = true;
+        }
+        else if (soldierClass == "Mercenary") {
+            panicDieAction = "PanicTargets";
+            canReceivePanic = false;
+        }
+        else if (soldierClass == "King") { 
+            panicDieAction = "NeverPanic";
+            canReceivePanic = false;
+        }
+        else {//Peasant
+            panicDieAction = "AlwaysPanic";
+            canReceivePanic = true;
+        }
+    }//InitializeSquad method
 
-
-    }
-
-    public int GetDiceCount() {
-        return unitsInSquad * dicePerUnit;
-    }
-
-}
+}//SoldierClassData struct
 
 class AnimationTask {
     public string animationType;   //Move, Attack, Rotate, Die
     public Vector3 targetVector = Vector3.one; //used as a location for Move and Attack. used as a directional vector for rotate
     public Animator targetAnimator = null; //used when we need to invoke animations connected to a specific unit out of the whole squad
+    
     //constructor overloads
     public AnimationTask(string animationType, Vector3 targetLocation) {   //used for move, attack
         this.animationType = animationType;
@@ -756,3 +798,4 @@ class AnimationTask {
     }
 
 }//AnimationTask
+

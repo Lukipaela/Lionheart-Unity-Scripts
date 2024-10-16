@@ -2,31 +2,28 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class UnitScript : MonoBehaviour
-{
+public class UnitScript : MonoBehaviour {
+    public bool isCaptain = false;  //captain is designated to play sounds that apply to the whole squad together, like marching sfx and (future) greetings / responses
     public SquadScript parentSquadScript;
-    public AudioSource unitAudioSource;
-    public AudioClip attackSound;
-    public AudioClip placementSound;
-    public AudioClip deathSound;
-    public AudioClip marchSound;
-    public AudioClip selectedSound;
-    public string unitClass;    //archer, knight, etc
-    public SkinnedMeshRenderer bodyMesh;
 
     //animation controls
-    private bool isRotating = false;
-    private bool isMoving = false;
-    private bool isAnimating = false;
+    [SerializeField] private AudioSource unitAudioSource;
+    [SerializeField] private AudioClip attackSound;
+    [SerializeField] private AudioClip placementSound;
+    [SerializeField] private AudioClip deathSound;
+    [SerializeField] private AudioClip marchSound;
+    [SerializeField] private AudioClip blockSound;
+    [SerializeField] private AudioClip selectedSound;
+    [SerializeField] private SkinnedMeshRenderer bodyMesh;
+    [SerializeField] private ParticleSystem bloodParticleSystem;
+    [SerializeField] private ParticleSystem sparkParticleSystem;
+    [SerializeField] private string unitClass;    //archer, knight, etc
     private readonly int rotationSpeed = 3;
     private readonly int movementSpeed = 1;
-    private Vector3 rotationTargetVector;
-    private Vector3 movementTargetVector;
     private List<AnimationTask> animationQueue = new List<AnimationTask>();
     private AnimationTask currentAnimationTask;
     private bool isDead = false;
-    private bool animatingAttack = false;
-    private bool animatingDeath = false;
+    [SerializeField] public string animationState = "Idle";    //serialized to aid in debugging
     //debug
     private static readonly bool enableDebugging = true;
 
@@ -35,208 +32,294 @@ public class UnitScript : MonoBehaviour
      * BUILT-IN METHODS *
      ********************/
 
-    void Start(){
-        animationQueue = new List<AnimationTask>();
+    void Start() {
     }
 
-    void Update(){
-        if (isRotating){
-            RotationFrameUpdate(gameObject, rotationTargetVector);
-        }//rotating logic
-
-        if (isMoving){
-            MovementFrameUpdate(gameObject, currentAnimationTask.targetVector);
-        }//moving logic
-
-        if (!isMoving && !isRotating && !animatingAttack && !animatingDeath){
+    void Update() {
+        if (currentAnimationTask == null) {
+            animationState = "Idle";
             CheckAnimationQueue();
         }//no longer animating
+        else if (animationState == "Rotating") {
+            RotationFrameUpdate(currentAnimationTask.targetVector);
+        }//rotating logic
+        else if (animationState == "Marching") {
+            MovementFrameUpdate(currentAnimationTask.targetVector);
+        }//moving logic
+
+        if (unitAudioSource.isPlaying && unitAudioSource.clip == marchSound && animationState != "Marching" && animationState != "Rotating" && animationState != "SquadMarching")
+            unitAudioSource.Stop();
+
     }//Update
 
 
     /*********************
      * ANIMATION METHODS *
      *********************/
-
-    private void RotationFrameUpdate(GameObject rotatingObject, Vector3 desiredForwardVector)
-    {
+    /// <summary>
+    /// Should be called by a repeating method (like Update), as it only turns one frame's distance per call.
+    /// Rotates the unit toward the specified vector until the unit's Forward vector matches it in direction.
+    /// </summary>
+    /// <param name="desiredForwardVector">The coordinates of the location this unit is sliding towards.</param>
+    private void RotationFrameUpdate(Vector3 desiredForwardVector) {
+        // Calculate a rotation a step closer to the target and apply rotation to this object
+        Vector3 newDirection = Vector3.RotateTowards(gameObject.transform.forward, desiredForwardVector, rotationSpeed * Time.deltaTime, 0.0f);
+        gameObject.transform.rotation = Quaternion.LookRotation(newDirection);
         //if we have reached our target orientation, stop rotating.
-        if (Vector3.Angle(rotatingObject.transform.forward, desiredForwardVector) < 1)
-        {
-            isRotating = false;
+        if (Vector3.Angle(gameObject.transform.forward, desiredForwardVector) < 1) {
+            ConsolePrint("Rotation complete.");
+            animationState = "Idle";
+            currentAnimationTask = null;
         }
-        else
-        {
-            // Rotate the forward vector towards the target direction by one step
-            Vector3 newDirection = Vector3.RotateTowards(rotatingObject.transform.forward, desiredForwardVector, rotationSpeed * Time.deltaTime, 0.0f);
-            // Calculate a rotation a step closer to the target and applies rotation to this object
-            rotatingObject.transform.rotation = Quaternion.LookRotation(newDirection);
-        }
-
     }//RotationFrameUpdate
 
-    private void MovementFrameUpdate(GameObject movingObject, Vector3 desiredLocation)
-    {
-        movingObject.transform.position = Vector3.MoveTowards(movingObject.transform.position, desiredLocation, movementSpeed * Time.deltaTime);
-        if (movingObject.transform.position == desiredLocation)
-        {
-            isMoving = false;
+    /// <summary>
+    /// Should be called by a repeating method (like Update), as it only moves one frame's distance per call.
+    /// Physically move the unit toward the designated target. Should usually be accompanied by a Walk animation.
+    /// </summary>
+    /// <param name="desiredLocation">The coordinates of the location this unit is sliding towards.</param>
+    private void MovementFrameUpdate( Vector3 desiredLocation) {
+        gameObject.transform.position = Vector3.MoveTowards(gameObject.transform.position, desiredLocation, movementSpeed * Time.deltaTime);
+        if (gameObject.transform.position == desiredLocation) {
+            ConsolePrint("Movement complete.");
+            animationState = "Idle";
+            currentAnimationTask = null;
         }//done moving
     } //MovementFrameUpdate
 
-    public void AddAnimationToQueue( string animationType, Vector3 animationVector )
-    {
-        //ConsolePrint("Adding animation to " + gameObject.name + " Type: " + animationType + " Along vector " + animationVector);
-        if (!isDead)
-        {
+    /// <summary>
+    /// Receives an animation request by description, and converts it to an AnimationTask object and adds it to the queue.
+    /// Ignores request if the unit has been marked as dead.
+    /// </summary>
+    /// <param name="animationType">The name of the animation bewing requested.</param>
+    /// <param name="animationVector">The vector associated with that animation, iof any. Usually used for rotation animations.</param>
+    public void AddAnimationToQueue(string animationType, Vector3 animationVector) {
+        if (!isDead) {
             AnimationTask nextTask = new AnimationTask(animationType, animationVector);
-            //ConsolePrint(nextTask.ToString());
             animationQueue.Add(nextTask);
-        }
+        }//not dead
+    }//AddAnimationToQueue
 
-}//AddAnimationToQueue
-
-    private void CheckAnimationQueue()
-    {
+    private void CheckAnimationQueue() {
         // if not currently doing anything, check the animation queue for a new action. 
-        if (animationQueue.Count > 0){
-            if (!isAnimating){
-                parentSquadScript.ReportUnitAnimationStart(gameObject.name + " starting animation queue");
-                isAnimating = true;
-            }
-
+        if (animationQueue.Count > 0) {
             currentAnimationTask = animationQueue[0];
             animationQueue.RemoveAt(0);
             ConsolePrint("Moving to animation: " + currentAnimationTask.animationType);
-            switch (currentAnimationTask.animationType){
 
+            switch (currentAnimationTask.animationType) {
                 case "March":
-                    if (currentAnimationTask.targetVector != Vector3.one)
-                    {
-                        isMoving = true;
-                        movementTargetVector = currentAnimationTask.targetVector;
-                    }
+                    if (currentAnimationTask.targetVector == Vector3.one)
+                        animationState = "SquadMarching";   //need to animate, but not physically move the unit. requires explicit order to stop.
+                    else
+                        animationState = "Marching";
                     AnimateUnit("March");
-                    unitAudioSource.loop = true;
-                    unitAudioSource.clip = marchSound;
-                    if (!unitAudioSource.isPlaying)
-                        unitAudioSource.Play();
+                    StartCoroutine(PlaySound(marchSound, true, true));
                     break;
 
                 case "Rotate":
-                    isRotating = true;
-                    rotationTargetVector = currentAnimationTask.targetVector;
+                    animationState = "Rotating";
                     AnimateUnit("March");
-                    unitAudioSource.loop = true;
-                    unitAudioSource.clip = marchSound;
-                    if(!unitAudioSource.isPlaying)
-                        unitAudioSource.Play();
+                    StartCoroutine(PlaySound(marchSound, true, true));
                     break;
 
                 case "Attack":
-                    unitAudioSource.Stop(); //End marching sound
-                    AnimateUnit("Attack"); 
-                    animatingAttack = true;
+                    animationState = "Attacking";
+                    AnimateUnit("Attack");
                     break;
 
                 case "Idle":
-                    unitAudioSource.Stop(); //End marching sound
+                    animationState = "Idle";
                     AnimateUnit("Idle");
+                    currentAnimationTask = null;
                     break;
 
                 case "Block":
-                    unitAudioSource.Stop(); //End marching sound
+                    animationState = "Blocking";
                     AnimateUnit("Block");
                     break;
 
                 case "Cheer":
-                    unitAudioSource.Stop(); //End marching sound
+                    animationState = "Cheering";
                     AnimateUnit("Cheer");
                     break;
 
                 case "Die":
-                    unitAudioSource.Stop(); //End marching sound
-                    //rotate a few degrees around the Y axis at random before animating the death, for variety 
-                    int maxRotationMagnitude = 35;
-                    int rotationAmount = Random.Range(-maxRotationMagnitude, maxRotationMagnitude); //measured in degrees
-                    Quaternion rotationToApply = Quaternion.Euler(0f, rotationAmount, 0f);
-                    transform.rotation = transform.rotation * rotationToApply;
-                    //call doe death animation, mark unit dead and animating
-                    AnimateUnit("Die");
-                    unitAudioSource.loop = false;
-                    unitAudioSource.clip = deathSound;
-                    unitAudioSource.Play();
-                    animatingDeath = true;
-                    isDead = true;
+                    animationState = "Dying";
+                    Die();
                     break;
-                    
             }//animation type switch 
         }//animations remain in queue
-        else if (isAnimating)
-        {
-            isAnimating = false;
-            parentSquadScript.ReportUnitAnimationComplete( gameObject.name + " end of animation queue");
-        }
     }//check animation queue
 
-    private ulong RandomizedSFXDelay(){
-        //returns a random short duration to delay SFX generation by, so that not all units make the same sound at exactly the same time.
-        const float sampleRate = 44100;
-        const float secondsDelayed = .05f;
-        return (ulong) Random.Range(0, sampleRate/ secondsDelayed);
+    /// <summary>
+    /// Plays Death animation and sound effect. 
+    /// Marks the unit as Dead.
+    /// </summary>
+    public void Die() {
+        unitAudioSource.Stop(); //End marching sound
+        //rotate a few degrees around the Y axis at random before animating the death, for variety 
+        int rotationAmount = Random.Range(-35, 35); //measured in degrees
+        Quaternion rotationToApply = Quaternion.Euler(0f, rotationAmount, 0f);
+        transform.rotation = transform.rotation * rotationToApply;
+        //call the death animation, mark unit dead and animating
+        bloodParticleSystem.Play();
+        AnimateUnit("Die");
+        StartCoroutine(PlaySound(deathSound, true, false));
+        isDead = true;
     }
 
-    private void AnimateUnit( string animationName ){
-        //ConsolePrint("Setting animation trigger " + animationName);
+    /// <summary>
+    /// Issues the command to the Animator to trigger the requested animation.
+    /// </summary>
+    /// <param name="animationName">The name of the animation bewing requested.</param>
+    private void AnimateUnit(string animationName) {
         transform.GetComponent<Animator>().SetTrigger(animationName);
     }//animateUnit
 
-    public void AttackHit()
-    {
+    /// <summary>
+    /// Adds Idle to the animation queue. Clears currentAnimationTask. 
+    /// Separated to a non-parameterized method to facilitate the use of Invoke().
+    /// </summary>
+    public void AddIdleTask() {
+        currentAnimationTask = null;
+        AddAnimationToQueue("Idle", Vector3.one);
+    }
+
+
+
+    /*************
+     * UTILITIES *
+     *************/
+
+    /// <summary>
+    /// called by GameControl at the start of the game, or when a mercenary is converted (future feature) to add team-based color to the soldiers' bodies.
+    /// </summary>
+    /// <param name="teamColor">The color associated with the team which now owns the unit.</param>
+    public void SetColor(Color teamColor) {
+        bodyMesh.material.color = teamColor;
+    }
+
+    /// <summary>
+    /// Stops current sound (if any), and plays the requested track. Optionally can inseret a small random offset delay before starting, and can be made to loop.
+    /// </summary>
+    /// <param name="soundToPlay">The Audio Clip to be played.</param>
+    /// <param name="useRandomDelay">Indicates if a small random delay should be imposed before playing the clip. 
+    /// This helps prevent all members of the squad from playinmg the same sound at exactly the same moment, stacking the volume.</param>
+    /// <param name="loopTrack">Indicates if the sound should loop indefinitely (until explicitly cancelled by some other process).</param>
+    private IEnumerator PlaySound(AudioClip soundToPlay, bool useRandomDelay, bool loopTrack) {
+        float delay = 0;
+        if (useRandomDelay) 
+            delay = Random.Range(0, 0.5f);
+        yield return new WaitForSeconds(delay);
+        unitAudioSource.Stop();
+        unitAudioSource.loop = loopTrack;
+        unitAudioSource.clip = soundToPlay;
+        if(isCaptain || soundToPlay != marchSound)  //only the captain plays marching sounds
+            unitAudioSource.Play();
+    }
+
+
+
+    /**********
+     * EVENTS *
+     **********/
+
+    /// <summary>
+    /// Called by the ControlScript when an attacker has reached the AttackHit trigger, and this defender is not being killed.
+    /// Plays SFX and activates particle effect.
+    /// </summary>
+    /// <param name=""></param>
+    /// <returns></returns>
+    public void Deflect() {
+        ConsolePrint("Deflect called");
+        sparkParticleSystem.Play();
+        StartCoroutine(PlaySound(blockSound, true, false));
+        currentAnimationTask = null;
+    }
+
+    /// <summary>
+    /// Called at the exact frame when THIS unit's attack animation would make contact with an enemy. 
+    /// Used in order to send a trigger to the enemy to Die or deflect
+    /// </summary>
+    /// <param name=""></param>
+    /// <returns></returns>
+    public void AttackHit() {
         ConsolePrint("AttackHit animation event called");
-        parentSquadScript.ReportAttackAnimationBeginning();
+        parentSquadScript.ReportAttackHit();
     }
 
-    public void BlockEnd()
-    {
+    /// <summary>
+    /// Called by the final frame of the Block animation, to indicate that the attacker's animation can now begin.
+    /// </summary>
+    /// <param name=""></param>
+    /// <returns></returns>
+    public void BlockEnd() {
         ConsolePrint("BlockEnd animation event called");
-        parentSquadScript.ReportBlockAnimationBeginning();
+        parentSquadScript.ReportBlockAnimationComplete();
+        unitAudioSource.Stop(); //End marching sound
     }
 
-    public void AttackEnd()
-    {
+    /// <summary>
+    /// Called by the final frame of the Attack animation, to indicate that the attacker is now free to return to their home tile/stance.
+    /// </summary>
+    /// <param name=""></param>
+    /// <returns></returns>
+    public void AttackEnd() {
         ConsolePrint("AttackEnd animation event called");
-        animatingAttack = false;
+        currentAnimationTask = null;
     }
 
-    public void DeathEnd()
-    {
+    /// <summary>
+    /// Called by the end of the death animation event, destroys the game object and decouples it from the squad.
+    /// </summary>
+    /// <param name=""></param>
+    /// <returns></returns>
+    public void DeathEnd() {
         ConsolePrint("DeathEnd called");
-        //called at the end of each death animation, allows the queue to be halted to wait for the end of this animation 
-        //note the end of the animation by removing the flag.
-        animatingDeath = false;
-        //remove this unit from the parent tile's ownership, mark it for future destruction
+        //remove this unit from the parent tile's ownership, mark it for future destruction (if not persisting bodies on the field)
         transform.parent = null;
         if (!GameSettings.persistBodies && unitClass != "King")
             Destroy(gameObject, GameSettings.deathLingerDuration);//destroy this object X seconds after it has performed its animation
+        currentAnimationTask = null;
     }
 
-    public void InitializeUnit(){
-        // this method should do any initial setup needed after the soldier has been assigned to a squad and player
-        //set body color to match team color
+    /// <summary>
+    /// Called at the final frame of Cheer, to trigger a transition back to Idle
+    /// </summary>
+    public void CheerEnd() {
+        ConsolePrint("Cheer End animation event called");
+        currentAnimationTask = null;
     }
 
-    public void SetColor(Color teamColor){
-        //called by GameControl at the start of the game, or when a mercenary is converted (future feature) to add team-based color to the soldiers' bodies.
-        bodyMesh.material.color = teamColor;
+    /// <summary>
+    /// Called at the conclusion of a squad relocation march, as only the Squad knows when the destination was reached, not the Unit.
+    /// </summary>
+    public void MarchEnd() {
+        AddIdleTask();
+        unitAudioSource.Stop(); //End marching sound
     }
-    
+
+    /// <summary>
+    /// A polling function called by the parent Squad script in order to determine if there are any unit-level animations running.
+    /// Used in order to determine if new actions can be taken now, or if the squad must continue to wait for the current queue to clear. 
+    /// If the only animation running is a king's cheer, will return False.
+    /// </summary>
+    public bool IsAnimating() {
+        if (unitClass == "King" && currentAnimationTask != null && currentAnimationTask.animationType == "Cheer")
+            return false;   //do not report a progress-blocking animation if it's just the king cheering. 
+        if (currentAnimationTask != null || animationQueue.Count > 0)
+            return true;
+        else
+            return false;
+    }
+
     /***************
      * DEBUG STUFF *
      ***************/
 
-    public void ConsolePrint(string message){
-        if (enableDebugging == true){
+    public void ConsolePrint(string message) {
+        if (enableDebugging == true) {
             Debug.Log("Unit Script - Team " + parentSquadScript.ownerID + ", " + gameObject.name + ": " + message);
         }
     }//console print

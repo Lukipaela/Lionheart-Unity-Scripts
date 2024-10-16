@@ -2,8 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class BoardTileScript : MonoBehaviour
-{
+public class BoardTileScript : MonoBehaviour {
     public GameObject adjacentTileLeft;
     public GameObject adjacentTileRight;
     public GameObject adjacentTileTop;
@@ -21,15 +20,14 @@ public class BoardTileScript : MonoBehaviour
     private bool validAttackTargetEffectOn = false;
     private Material thisTileMaterial;
 
-    private static readonly bool enableDebugging = false;
+    private static readonly bool enableDebugging = true;
 
 
     /********************
      * BUILT-IN METHODS *
      ********************/
 
-    private void Start()
-    {
+    private void Start() {
         gameControlScript = GameObject.FindGameObjectWithTag("GameControl").GetComponent<GameControl>();
         isOccupied = false;
         occupyingSquad = null;
@@ -41,28 +39,24 @@ public class BoardTileScript : MonoBehaviour
      * CUSTOM METHODS *
      ******************/
 
-    public void ClearTile()
-    {
+    public void ClearTile() {
+        ConsolePrint("clearing tile: " + gameObject.name + " of previous occupying squad: " + occupyingSquad.gameObject.name);
         isOccupied = false;
         occupyingSquad = null;
         thisTileMaterial.color = GameSettings.defaultBoardTileColor;
         ClearAllHighlights();
     }
 
-    public void PlaceSquad( GameObject squadObject)
-    {
+    public void PlaceSquad(GameObject squadObject) {
+        ConsolePrint("placing squad: " + squadObject.name);
         isOccupied = true;
         occupyingSquad = squadObject;
         EnableHighlight("Selected");
-        thisTileMaterial.color = GameSettings.playerColors[squadObject.GetComponent<SquadScript>().ownerID];
+        //thisTileMaterial.color = GameSettings.playerColors[squadObject.GetComponent<SquadScript>().ownerID];
     }
 
-    public void EnableHighlight( string highlightType )
-    {
-        ConsolePrint("Toggling highlight of type " + highlightType + " for " + gameObject.name);
-
-        switch (highlightType)
-        {
+    public void EnableHighlight(string highlightType) {
+        switch (highlightType) {
             case "Selected":
                 gameObject.transform.GetChild(0).GetChild(0).GetComponent<ParticleSystem>().Play();
                 selectedEffectOn = true;
@@ -78,11 +72,10 @@ public class BoardTileScript : MonoBehaviour
                 validAttackTargetEffectOn = true;
                 break;
         }//switch highlight type
-        
+
     }//toggleHighlighting
 
-    public void ClearAllHighlights()
-    {
+    public void ClearAllHighlights() {
         selectedEffectOn = false;
         gameObject.transform.GetChild(0).GetChild(0).GetComponent<ParticleSystem>().Stop();//first child call gets the particle system bucket. second gets the individual particle system
         gameObject.transform.GetChild(0).GetChild(0).GetComponent<ParticleSystem>().Clear();//first child call gets the particle system bucket. second gets the individual particle system
@@ -103,11 +96,9 @@ public class BoardTileScript : MonoBehaviour
      * DEBUG STUFF *
      ***************/
 
-    public void ConsolePrint(string message)
-    {
-        if (enableDebugging == true)
-        {
-            Debug.Log("Board Tile Script - " + message);
+    private void ConsolePrint(string message) {
+        if (enableDebugging == true) {
+            Debug.Log("Board Tile Script " + gameObject.name + ": " + message);
         }
     }//console print
 

@@ -2,16 +2,16 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class DiceController : MonoBehaviour
-{
-    public DieSpawner dieSpawnerScript;
-    public AudioSource dieAudioSource;
-    public AudioClip dieColliderSound;
+public class DiceController : MonoBehaviour {
+    //private fields
+    [SerializeField] private DieSpawner dieSpawnerScript;
+    [SerializeField] private AudioSource dieAudioSource;
+    [SerializeField] private AudioClip dieColliderSound;
     private Rigidbody dieRigidBody;
     private Transform groundTransform;
-    private bool inMotion;
     private bool activeDie;
 
+    //debug
     private static readonly bool enableDebugging = false;
 
 
@@ -20,26 +20,20 @@ public class DiceController : MonoBehaviour
      ********************/
 
     // Start is called before the first frame update
-    void Start()
-    {
+    void Start() {
         dieSpawnerScript = GameObject.FindGameObjectWithTag("DiceControl").GetComponent<DieSpawner>();
         groundTransform = GameObject.FindGameObjectWithTag("Ground").transform;
         dieRigidBody = gameObject.GetComponent<Rigidbody>();
-        inMotion = true;
         activeDie = true;
     }
 
     // Update is called once per frame
-    void Update()
-    {
-        if (dieRigidBody.IsSleeping() && activeDie)
-        {
-            //find out which side faces up and report it back to the game controller 
-
+    void Update() {
+        if (dieRigidBody.IsSleeping() && activeDie) {
+            //find out which side faces up and report it back to the die spawner
             string result = GetRollResult();
             int particleEffectIndex = 0;
-            switch (result)
-            {
+            switch (result) {
                 case "Error":   //die not settled yet
                     ConsolePrint("Nudging..");
                     int nudgeMagnitude = 100;
@@ -59,7 +53,7 @@ public class DiceController : MonoBehaviour
                     break;
             }
 
-            if (!activeDie){
+            if (!activeDie) {
                 //die has settled, report result and play particle effect
                 dieSpawnerScript.DieRollReport(result);
                 transform.GetChild(particleEffectIndex).transform.rotation = Quaternion.LookRotation(Vector3.up, Vector3.forward);
@@ -69,35 +63,38 @@ public class DiceController : MonoBehaviour
 
     }//update
 
-    private void OnCollisionEnter(Collision collision)    {
+    private void OnCollisionEnter(Collision collision) {
         dieAudioSource.PlayOneShot(dieColliderSound);
     }
+
+
 
     /******************
      * CUSTOM METHODS *
      ******************/
 
-    private string GetRollResult()
-    {
+    private string GetRollResult() {
+        ConsolePrint("Checking die result..");
         if ((gameObject.transform.up == groundTransform.up) || (gameObject.transform.right == -1 * groundTransform.up) || (gameObject.transform.forward == -1 * groundTransform.up))
             return "Axe";
         else if ((gameObject.transform.up == -1 * groundTransform.up) || (gameObject.transform.forward == groundTransform.up))
             return "Arrow";
         else if (gameObject.transform.right == groundTransform.up)
             return "Panic";
-        else
-            return "Error";
+        else {
+            //the die has not settled flat on the ground yet. will be nudged.
+        }
+        return "Error";
     }
+
 
 
     /***************
      * DEBUG STUFF *
      ***************/
 
-    public void ConsolePrint(string message)
-    {
-        if (enableDebugging == true)
-        {
+    public void ConsolePrint(string message) {
+        if (enableDebugging == true) {
             Debug.Log("Die Controller - " + message);
         }
     }//console print

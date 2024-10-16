@@ -9,32 +9,32 @@ using UnityEngine.UI;
 public class GameControl : MonoBehaviour {
     // PUBLIC VARS
     public string gamePhase;    //PlaceArmyP1, PlaceArmyP2, DiceRoll, ActiveGame, GameOver, RollForFirst
-    public int activePlayerID;
-    public GameObject currentSelectedBoardTile;
+    public int activePlayerID = 0;
     public PlayerScript[] playerScripts;
-    public GameObject[] ReferenceCenterTiles;
-    public LightingControl lightControlScript;
-    public AudioControl audioControlScript;
 
     //PRIVATE VARS (Serialized fields are accessible within the editor, but aren't exposed to other scripts as a facet of this class
+    [SerializeField] private GameObject currentSelectedBoardTile;
+    [SerializeField] private GameObject[] ReferenceCenterTiles;
+    [SerializeField] private LightingControl lightControlScript;
+    [SerializeField] private AudioControl audioControlScript;
     [SerializeField] private RotationArrowControl rotationArrowControlScript;
     [SerializeField] private HUDControlScript hudControlScript;
-    private DieSpawner dieSpawnerScript;
-    private CameraControl cameraControlScript;
+    [SerializeField] private DieSpawner dieSpawnerScript;
+    [SerializeField] private CameraControl cameraControlScript;
     private GameObject currentSelectedSquad;
     private string squadToPlacePrefabAddress;
     private string placementState;//indicates if the player is choosing a squad to place, or choosing a location to place a squad: Idle , PlacingSquad
-    private bool animating = false; //tracks if there is an animation running, so as to avoid advancing the game phase too soon. 
-    private int animationCount = 0;
     //variables for determining turn order
     private int[] playerScore = new int[] { 0, 0 };
     private bool diceRollIsValid = false;
     private bool waitingForAttack = false; // a trigger to coordinate the timing of the attack animation and the death animation in a battle 
     private bool waitingForDefense = false; // a trigger to coordinate the timing of the defense animation and the death animation in a battle 
+    private bool actionTaken = false;   //indicates if some ap-consuming action has been taken inm this loop
     private CombatData combatData;
 
     //debug
     private readonly bool enableDebugging = true; //switch to enable/disable console logging for this script
+
 
 
     /********************
@@ -46,13 +46,6 @@ public class GameControl : MonoBehaviour {
 
         //initialize random seed
         Random.InitState(System.Environment.TickCount);
-
-        //get object references
-        dieSpawnerScript = GameObject.FindGameObjectWithTag("DiceControl").GetComponent<DieSpawner>();
-        cameraControlScript = GameObject.FindGameObjectWithTag("CameraControl").GetComponent<CameraControl>();
-
-        //initialize stuff
-        InitializeVariables();
 
         //start up the game
         if (GameSettings.gameMode == "QuickStart")
@@ -67,14 +60,12 @@ public class GameControl : MonoBehaviour {
 
     private void Update() {
         CheckKeyboardCommands();
-
         //check on the animation status to potentially release the controls 
-        if (animating && animationCount == 0 && gamePhase == "ActiveGame") {
-            animating = false;
+        if (!SquadsAreAnimating()  && gamePhase == "ActiveGame" && actionTaken) {
             ActionComplete();
         }
-
     }//Update
+
 
 
     /******************
@@ -120,6 +111,7 @@ public class GameControl : MonoBehaviour {
             yield break;
 
     }//begin army placement 
+
 
 
     /*****************
@@ -265,16 +257,18 @@ public class GameControl : MonoBehaviour {
 
     private void ActionComplete() {
         ConsolePrint("Action complete called for Player " + activePlayerID + " with " + playerScripts[activePlayerID].apRemaining + " AP Remaining");
+        actionTaken = false;
 
         if (gamePhase != "PlaceArmyP1" && gamePhase != "PlaceArmyP2") {
             //reenable the hud, in case it was hidden for diceroll/animation
             hudControlScript.SetTurnDataPanelVisibility(true);
             hudControlScript.SetTurnData(activePlayerID, playerScripts[activePlayerID].apRemaining);
-            if (cameraControlScript.combatCameraActive)
-                cameraControlScript.DisableCombatCamera();
 
             //reset all tile highlight effects and attackable/movable flags
             ResetAllTileFlags();
+
+            if (cameraControlScript.combatCameraActive)
+                cameraControlScript.DisableCombatCamera();
 
             //called after animations end, to  see if the turn is over. 
             if (playerScripts[activePlayerID].apRemaining == 0) {
@@ -317,31 +311,19 @@ public class GameControl : MonoBehaviour {
     }
 
 
+
     /********************
      * EXTERNAL REPORTS *
      ********************/
-
-    public void ReportAnimationStart(string reportData) {
-        animating = true;
-        animationCount++;
-        ConsolePrint("Squad animation (" + reportData + ") started. " + animationCount + " total squad animations running.");
-    }//report animation start
-
-    public void ReportAnimationComplete(string reportData) {
-        //called by other gameobjects when an animation has ended. once all have reported completion, we can move on.
-        animationCount--;
-        ConsolePrint("Squad animation (" + reportData + ") ended. " + animationCount + " squad animations remaining.");
-    }//report animation complete
-
+         
     public void ReportSquadElimenated(GameObject elimenatedSquad) {
         ConsolePrint("Squad Elimenation report received.");
         //collect information
         SquadScript elimenatedSquadControlScript = elimenatedSquad.GetComponent<SquadScript>();
         int associatedPlayerID = elimenatedSquadControlScript.ownerID;
-        //tell theplayer a squad was lost
+        //tell the player a squad was lost
         playerScripts[associatedPlayerID].SquadLost(elimenatedSquadControlScript.soldierClassData.unitClass);
         //tell the tile that the tile is now vacant
-        elimenatedSquadControlScript.occupiedGameTile.GetComponent<BoardTileScript>().ClearTile();
         if (elimenatedSquad == currentSelectedSquad) {
             currentSelectedSquad = null;
             rotationArrowControlScript.HideArrows();
@@ -355,12 +337,15 @@ public class GameControl : MonoBehaviour {
         hudControlScript.PrintMessage("GAME OVER. " + GameSettings.playerNames[(defeatedPlayerID + 1) % 2] + " wins!");
     }//Report player defeated
 
-    public void ReportAttackAnimationBeginning() {
+    public void ReportAttackHit() {
         ConsolePrint("Attack animation start report received");
         waitingForAttack = false;
     }
 
-    public void ReportBlockAnimationBeginning() {
+    /// <summary>
+    /// Called by a defender squad in order to signal that it has finished its block animation and the attacker can proceed
+    /// </summary>
+    public void ReportBlockAnimationComplete() {
         ConsolePrint("Block animation start report received");
         waitingForDefense = false;
     }
@@ -405,7 +390,7 @@ public class GameControl : MonoBehaviour {
 
         //if damage was done, perform attack animations
         if (combatData.damageDealt > 0) {
-            cameraControlScript.EnableCombatCamera(combatData.defenderSquad.transform.GetChild(1).gameObject);
+            cameraControlScript.EnableCombatCamera(combatData.attackerSquad.gameObject , combatData.defenderSquad.gameObject);
             //trigger the defense animation for the defender, and wait for it to complete
             combatData.defenderSquadScript.Defend(combatData.vectorToAttacker);
             waitingForDefense = true;
@@ -426,22 +411,31 @@ public class GameControl : MonoBehaviour {
             combatData.defenderSquadScript.Idle();
         }
 
-        //handle panic events
-        switch (combatData.panicResult) {
-            case "AttackerPanics":
-                ConsolePrint("Attacker panics");
-                Panic(combatData.panicDistance, combatData.attackerSquadScript, (combatData.attackerSquadScript.orientationIndex + 2) % 4);
-                break;
-            case "DefenderPanics":
-                Panic(combatData.panicDistance, combatData.defenderSquadScript, combatData.attackerSquadScript.orientationIndex);
-                break;
-            default:
-                //no panic occurred (insufficient panics rolled, or unit can not panic)
-                break;
-        }//panic switch
+        //handle panic events, if any defenders remain
+        if(combatData.defenderSquadScript.unitsRemaining > 0) { 
+            switch (combatData.panicResult) {
+                case "AttackerPanics":
+                    ConsolePrint("Attacker panicks");
+                    StartCoroutine(AnimateCamera("ActiveGame", true));
+                    StartCoroutine(combatData.attackerSquadScript.Panic(combatData.panicDistance, (combatData.attackerSquadScript.orientationIndex + 2) % 4));
+                    DeselectPreviousSquad();
+                    break;
+                case "DefenderPanics":
+                    ConsolePrint("Defender panicks");
+                    StartCoroutine(AnimateCamera("ActiveGame", true));
+                    StartCoroutine(combatData.defenderSquadScript.Panic(combatData.panicDistance, combatData.attackerSquadScript.orientationIndex));
+                    break;
+                default:
+                    //no panic occurred (insufficient panics rolled, or unit can not panic)
+                    break;
+            }//panic switch
+        }//if defenders remain
 
-        //return the camera to active game position if no damage was done. else, we will move to combat position next
+        //return the camera/gamePhase to active if no bonus roll earned, signifying end of action.
         if (!combatData.bonusRollTriggered) {
+            while (SquadsAreAnimating()) {
+                yield return new WaitForSeconds(0.1f);
+            }
             StartCoroutine(AnimateCamera("ActiveGame", true));
             gamePhase = "ActiveGame";
         }
@@ -449,10 +443,6 @@ public class GameControl : MonoBehaviour {
             Attack(combatData.attackerSquad, combatData.defenderSquad, true);
     }//resolve attack
 
-    public void Panic(int panicDistance, SquadScript panickingSquad, int retreatDirection) {
-        ConsolePrint("Panicking distance of " + panicDistance);
-        panickingSquad.Panic(panicDistance, retreatDirection);
-    }//panic
 
 
     /****************
@@ -460,227 +450,221 @@ public class GameControl : MonoBehaviour {
      ****************/
 
     public void SquadClicked(GameObject selectedSquad) {
-        if (!animating) {
-            ConsolePrint(selectedSquad.name + " clicked.");
+        ConsolePrint(selectedSquad.name + " clicked.");
 
-            SquadScript selectedSquadScript = selectedSquad.GetComponent<SquadScript>();
+        SquadScript selectedSquadScript = selectedSquad.GetComponent<SquadScript>();
 
-            //pass off control management to he board tile clicked method
-            BoardTileClicked(selectedSquadScript.occupiedGameTile);
-        }
+        //pass off control management to he board tile clicked method
+        BoardTileClicked(selectedSquadScript.occupiedGameTile);
     }//squad selected
 
     public void BoardTileClicked(GameObject selectedBoardTile) {
-        if (!animating) {
-            ConsolePrint(selectedBoardTile.name + " click detected by control script in phase " + gamePhase);
-            BoardTileScript selectedTileControlScript = selectedBoardTile.GetComponent<BoardTileScript>();
-            switch (gamePhase) {
-                case "PlaceArmyP1":
-                case "PlaceArmyP2":
-                    #region
-                    if (placementState == "Idle") {
-                        if (selectedTileControlScript.isOccupied == true) {
-                            //if we are altering placement, but we pick a new squad, toggle to that squad instead.
-                            if (currentSelectedSquad != null)
-                                DeselectPreviousSquad();
-                            if (currentSelectedSquad != selectedTileControlScript.occupyingSquad) {
-                                currentSelectedSquad = selectedTileControlScript.occupyingSquad;
-                                currentSelectedSquad.GetComponent<SquadScript>().SetSelected(true);
-                                rotationArrowControlScript.AssignToSquad(currentSelectedSquad);
-                            }
-                            else {
-                                //no action for selecting the same squad again
-                            }
-                        }//occupied
+        ConsolePrint(selectedBoardTile.name + " click detected by control script in phase " + gamePhase);
+        BoardTileScript selectedTileControlScript = selectedBoardTile.GetComponent<BoardTileScript>();
+        switch (gamePhase) {
+            case "PlaceArmyP1":
+            case "PlaceArmyP2":
+                #region
+                if (placementState == "Idle") {
+                    if (selectedTileControlScript.isOccupied == true) {
+                        //if we are altering placement, but we pick a new squad, toggle to that squad instead.
+                        if (currentSelectedSquad != null)
+                            DeselectPreviousSquad();
+                        if (currentSelectedSquad != selectedTileControlScript.occupyingSquad) {
+                            currentSelectedSquad = selectedTileControlScript.occupyingSquad;
+                            currentSelectedSquad.GetComponent<SquadScript>().SetSelected(true);
+                            rotationArrowControlScript.AssignToSquad(currentSelectedSquad);
+                        }
                         else {
-                            if (currentSelectedSquad != null) {
-                                //we have a squad selected, and we just clicked an empty space. relocate squad if valid
-                                if ((activePlayerID == 0 && selectedTileControlScript.row > 1) || (activePlayerID == 1 && selectedTileControlScript.row < 7)) {
-                                    hudControlScript.PrintMessage("Squads can only be placed on the back two rows!");
-                                }//invalid row
-                                else {
-                                    MoveSquadPosition(currentSelectedSquad, selectedBoardTile);
-                                    rotationArrowControlScript.HideArrows();
-                                }
-                            }
-                        }//empty tile clicked
-                    }//idle state
-                    else if (placementState == "PlacingSquad") {
-                        if (selectedTileControlScript.isOccupied == false) {
+                            //no action for selecting the same squad again
+                        }
+                    }//occupied
+                    else {
+                        if (currentSelectedSquad != null) {
+                            //we have a squad selected, and we just clicked an empty space. relocate squad if valid
                             if ((activePlayerID == 0 && selectedTileControlScript.row > 1) || (activePlayerID == 1 && selectedTileControlScript.row < 7)) {
-                                audioControlScript.ErrorClick();
                                 hudControlScript.PrintMessage("Squads can only be placed on the back two rows!");
                             }//invalid row
                             else {
-                                audioControlScript.GeneralButtonClick();
-                                ConsolePrint("Instantiation object with address: " + squadToPlacePrefabAddress);
-                                //create, place, define the squad
-                                GameObject newSquad = CreateAndPlaceSquad(selectedBoardTile, activePlayerID, hudControlScript.selectedSquadType, hudControlScript.selectedSquadSize, squadToPlacePrefabAddress);
-                                if (hudControlScript.selectedSquadType == "King") {
-                                    ConsolePrint("Assigning king for " + gamePhase);
-                                    if (gamePhase == "PlaceArmyP1")
-                                        playerScripts[0].kingSquadScript = newSquad.GetComponent<SquadScript>();
-                                    else
-                                        playerScripts[1].kingSquadScript = newSquad.GetComponent<SquadScript>();
-                                }
-
-                                //deselect squad after placing in order to do multi-drop
-                                currentSelectedSquad = null;
-                                bool squadTypeExhausted = hudControlScript.SquadWasPlaced();
-
-                                //return to idle state, signal to HUD that placement is complete if remaining troop count for this squad type is zero
-                                if (squadTypeExhausted)
-                                    placementState = "Idle";
-                            }//valid placement
-                        }//unoccupied tile
-                        else {
-                            audioControlScript.ErrorClick();
-                            hudControlScript.PrintMessage("This space is already occupied!");
-                        }//occupied tile
-                    }//placing squad mode
-                    #endregion 
-                    break;
-
-                case "ActiveGame":
-                    ConsolePrint("BoardTileClicked - ActiveGame case.");
-                    if (currentSelectedSquad == null) {
-                        //ConsolePrint("Prior selected squad was null.");
-                        if (selectedTileControlScript.occupyingSquad == null) {
-                            //No Squad selected, and clicked tile is empty. ignore.
-                            ConsolePrint("No Squad selected, and clicked tile is empty. Click ignored");
+                                MoveSquadPosition(currentSelectedSquad, selectedBoardTile);
+                                rotationArrowControlScript.HideArrows();
+                            }
                         }
+                    }//empty tile clicked
+                }//idle state
+                else if (placementState == "PlacingSquad") {
+                    if (selectedTileControlScript.isOccupied == false) {
+                        if ((activePlayerID == 0 && selectedTileControlScript.row > 1) || (activePlayerID == 1 && selectedTileControlScript.row < 7)) {
+                            audioControlScript.ErrorClick();
+                            hudControlScript.PrintMessage("Squads can only be placed on the back two rows!");
+                        }//invalid row
                         else {
-                            GameObject clickedSquad = selectedTileControlScript.occupyingSquad;
-                            if (clickedSquad.GetComponent<SquadScript>().ownerID != activePlayerID) {
-                                //ignore command, selected squad doesnt belong to the current player.
-                                ConsolePrint("Enemy Squad clicked, invalid. Click ignored");
+                            audioControlScript.GeneralButtonClick();
+                            ConsolePrint("Instantiation object with address: " + squadToPlacePrefabAddress);
+                            //create, place, define the squad
+                            GameObject newSquad = CreateAndPlaceSquad(selectedBoardTile, activePlayerID, hudControlScript.selectedSquadType, hudControlScript.selectedSquadSize, squadToPlacePrefabAddress);
+                            if (hudControlScript.selectedSquadType == "King") {
+                                ConsolePrint("Assigning king for " + gamePhase);
+                                if (gamePhase == "PlaceArmyP1")
+                                    playerScripts[0].kingSquadScript = newSquad.GetComponent<SquadScript>();
+                                else
+                                    playerScripts[1].kingSquadScript = newSquad.GetComponent<SquadScript>();
+                            }
+
+                            //deselect squad after placing in order to do multi-drop
+                            currentSelectedSquad = null;
+                            bool squadTypeExhausted = hudControlScript.SquadWasPlaced();
+
+                            //return to idle state, signal to HUD that placement is complete if remaining troop count for this squad type is zero
+                            if (squadTypeExhausted)
+                                placementState = "Idle";
+                        }//valid placement
+                    }//unoccupied tile
+                    else {
+                        audioControlScript.ErrorClick();
+                        hudControlScript.PrintMessage("This space is already occupied!");
+                    }//occupied tile
+                }//placing squad mode
+                #endregion 
+                break;
+
+            case "ActiveGame":
+                ConsolePrint("BoardTileClicked - ActiveGame case.");
+                if (currentSelectedSquad == null) {
+                    //ConsolePrint("Prior selected squad was null.");
+                    if (selectedTileControlScript.occupyingSquad == null) {
+                        //No Squad selected, and clicked tile is empty. ignore.
+                        ConsolePrint("No Squad selected, and clicked tile is empty. Click ignored");
+                    }
+                    else {
+                        GameObject clickedSquad = selectedTileControlScript.occupyingSquad;
+                        if (clickedSquad.GetComponent<SquadScript>().ownerID != activePlayerID) {
+                            //ignore command, selected squad doesnt belong to the current player.
+                            ConsolePrint("Enemy Squad clicked, invalid. Click ignored");
+                        }
+                        else {//player has clicked on one of their own squad tiles
+                            audioControlScript.GeneralButtonClick();
+                            currentSelectedSquad = clickedSquad;
+                            currentSelectedSquad.GetComponent<SquadScript>().SetSelected(true);
+                            rotationArrowControlScript.AssignToSquad(currentSelectedSquad);
+                        }//player has clicked on one of their own squad tiles
+                    }//tile was occupied
+                }//no squad currently selected
+                else {
+                    SquadScript currentSelectedSquadScript = currentSelectedSquad.GetComponent<SquadScript>();
+
+                    if (selectedTileControlScript.occupyingSquad == null) {
+                        //clicked tile is empty
+                        if (selectedTileControlScript.validMoveTarget) {
+                            int apRequired = currentSelectedSquadScript.soldierClassData.apCostToMove;
+                            int apRemaining = playerScripts[activePlayerID].apRemaining;
+                            if (apRemaining < apRequired) {
+                                audioControlScript.ErrorClick();
+                                hudControlScript.PrintMessage("Insufficient AP for this action.");
                             }
                             else {
-                                //player has clicked on one of their own squad tiles
+                                //decrease the player's AP
+                                actionTaken = true;
                                 audioControlScript.GeneralButtonClick();
-                                currentSelectedSquad = clickedSquad;
-                                currentSelectedSquad.GetComponent<SquadScript>().SetSelected(true);
-                                rotationArrowControlScript.AssignToSquad(currentSelectedSquad);
-                            }//player has clicked on one of their own squad tiles
-                        }//tile was occupied
-                    }//no squad currently selected
+                                rotationArrowControlScript.HideArrows();
+                                playerScripts[activePlayerID].ConsumeAP(apRequired);
+                                ResetAllTileFlags();
+                                MoveSquadPosition(currentSelectedSquad, selectedBoardTile);
+                            }//MOVE
+                        }//valid move target
+                        else {
+                            //the clicked tile is not a valid move target, ignore command.
+                        }
+                    }//clicked tile is empty
                     else {
-                        SquadScript currentSelectedSquadScript = currentSelectedSquad.GetComponent<SquadScript>();
+                        //clicked tile is NOT empty
+                        GameObject clickedSquad = selectedTileControlScript.occupyingSquad;
 
-                        if (selectedTileControlScript.occupyingSquad == null) {
-                            //clicked tile is empty
-                            if (selectedTileControlScript.validMoveTarget) {
-                                int apRequired = currentSelectedSquadScript.soldierClassData.apCostToMove;
+                        if (clickedSquad.GetComponent<SquadScript>().ownerID != activePlayerID) {
+                            //targeting an enemy tile
+                            ConsolePrint("BoardTileClicked - attack logic.");
+                            //check if the tile is a valid attack target 
+                            if (selectedTileControlScript.validAttackTarget) {
+                                //attack requested
+                                //check if we have enough AP 
+                                int apRequired = currentSelectedSquadScript.soldierClassData.apCostToAttack;
                                 int apRemaining = playerScripts[activePlayerID].apRemaining;
                                 if (apRemaining < apRequired) {
                                     audioControlScript.ErrorClick();
                                     hudControlScript.PrintMessage("Insufficient AP for this action.");
                                 }
-                                else {
-                                    //decrease the player's AP
+                                else {  //begin attack mechanic
+                                    actionTaken = true;
                                     audioControlScript.GeneralButtonClick();
                                     rotationArrowControlScript.HideArrows();
+                                    //decrease the player's AP
                                     playerScripts[activePlayerID].ConsumeAP(apRequired);
+                                    //attack
                                     ResetAllTileFlags();
-                                    MoveSquadPosition(currentSelectedSquad, selectedBoardTile);
-                                }//MOVE
-                            }//valid move target
-                            else {
-                                //the clicked tile is not a valid move target, ignore command.
-                            }
-                        }//clicked tile is empty
-                        else {
-                            //clicked tile is NOT empty
-                            GameObject clickedSquad = selectedTileControlScript.occupyingSquad;
-
-                            if (clickedSquad.GetComponent<SquadScript>().ownerID != activePlayerID) {
-                                //targeting an enemy tile
-                                ConsolePrint("BoardTileClicked - attack logic.");
-                                //check if the tile is a valid attack target 
-                                if (selectedTileControlScript.validAttackTarget) {
-                                    //attack requested
-                                    //check if we have enough AP 
-                                    int apRequired = currentSelectedSquadScript.soldierClassData.apCostToAttack;
-                                    int apRemaining = playerScripts[activePlayerID].apRemaining;
-                                    if (apRemaining < apRequired) {
-                                        audioControlScript.ErrorClick();
-                                        hudControlScript.PrintMessage("Insufficient AP for this action.");
-                                    }
-                                    else {  //begin attack mechanic
-                                        audioControlScript.GeneralButtonClick();
-                                        rotationArrowControlScript.HideArrows();
-                                        //decrease the player's AP
-                                        playerScripts[activePlayerID].ConsumeAP(apRequired);
-                                        //attack
-                                        ResetAllTileFlags();
-                                        Attack(currentSelectedSquad, clickedSquad, false);
-                                    }// attack
-                                }//in attack range 
-                            }//enemy targeted
-                            else {  //clicked a different friendly squad, shift focus there
-                                ConsolePrint("BoardTileClicked - change selection logic.");
-                                audioControlScript.GeneralButtonClick();
-                                DeselectPreviousSquad();
-                                currentSelectedSquad = clickedSquad;
-                                currentSelectedSquad.GetComponent<SquadScript>().SetSelected(true);
-                                rotationArrowControlScript.AssignToSquad(currentSelectedSquad);
-                            }//player has clicked on one of their own squad tiles
-                        }//tile was occupied
-                    }//player had already selected a squad to issue orders to 
-                    break;
-            }//phase switch 
-        }// !animating
+                                    Attack(currentSelectedSquad, clickedSquad, false);
+                                }// attack
+                            }//in attack range 
+                        }//enemy targeted
+                        else {  //clicked a different friendly squad, shift focus there
+                            ConsolePrint("BoardTileClicked - change selection logic.");
+                            audioControlScript.GeneralButtonClick();
+                            DeselectPreviousSquad();
+                            currentSelectedSquad = clickedSquad;
+                            currentSelectedSquad.GetComponent<SquadScript>().SetSelected(true);
+                            rotationArrowControlScript.AssignToSquad(currentSelectedSquad);
+                        }//player has clicked on one of their own squad tiles
+                    }//tile was occupied
+                }//player had already selected a squad to issue orders to 
+                break;
+        }//phase switch 
     }//board tile clicked
 
     public void RotationArrowClicked(GameObject arrow) {
-        if (!animating) {
-            ConsolePrint("Rotation arrow clicked.");
-            RotationArrowControl arrowControl = arrow.transform.parent.GetComponent<RotationArrowControl>();
-            string rotationDirection = arrowControl.GetDirection(arrow);
+        ConsolePrint("Rotation arrow clicked.");
+        RotationArrowControl arrowControl = arrow.transform.parent.GetComponent<RotationArrowControl>();
+        string rotationDirection = arrowControl.GetDirection(arrow);
 
-            switch (gamePhase) {
-                case "PlaceArmyP1":
-                case "PlaceArmyP2":
-                    //find out which way to rotate
-                    //tell the associated squad to turn. (no validations around AP remianing in this phase)
+        switch (gamePhase) {
+            case "PlaceArmyP1":
+            case "PlaceArmyP2":
+                //find out which way to rotate
+                //tell the associated squad to turn. (no validations around AP remianing in this phase)
+                audioControlScript.RotationArrowClick();
+                arrowControl.associatedSquad.GetComponent<SquadScript>().RotateSquad(rotationDirection);
+                break;
+
+            case "ActiveGame":
+                int apRequired = currentSelectedSquad.GetComponent<SquadScript>().soldierClassData.apCostToRotate;
+                int apRemaining = playerScripts[activePlayerID].apRemaining;
+                if (apRemaining < apRequired) {
+                    audioControlScript.ErrorClick();
+                    hudControlScript.PrintMessage("Insufficient AP for this action");
+                }
+                else {
+                    actionTaken = true;
                     audioControlScript.RotationArrowClick();
-                    arrowControl.associatedSquad.GetComponent<SquadScript>().RotateSquad(rotationDirection);
-                    break;
-
-                case "ActiveGame":
-                    int apRequired = currentSelectedSquad.GetComponent<SquadScript>().soldierClassData.apCostToRotate;
-                    int apRemaining = playerScripts[activePlayerID].apRemaining;
-                    if (apRemaining < apRequired) {
-                        audioControlScript.ErrorClick();
-                        hudControlScript.PrintMessage("Insufficient AP for this action");
-                    }
-                    else {
-                        audioControlScript.RotationArrowClick();
-                        SquadScript currentSelectedSquadScript = arrowControl.associatedSquad.GetComponent<SquadScript>();
-                        //decrease the player's AP
-                        playerScripts[activePlayerID].ConsumeAP(apRequired);
-                        //tell the associated squad to turn. (no validations around AP remianing in this phase)
-                        currentSelectedSquadScript.RotateSquad(rotationDirection);
-                        ResetAllTileFlags();
-                        rotationArrowControlScript.HideArrows();
-                    }//valid action
-                    break;
-
-            }//game phase switch
-        }// !animating
+                    SquadScript currentSelectedSquadScript = arrowControl.associatedSquad.GetComponent<SquadScript>();
+                    //decrease the player's AP
+                    playerScripts[activePlayerID].ConsumeAP(apRequired);
+                    //tell the associated squad to turn. (no validations around AP remianing in this phase)
+                    currentSelectedSquadScript.RotateSquad(rotationDirection);
+                    ResetAllTileFlags();
+                    rotationArrowControlScript.HideArrows();
+                }//valid action
+                break;
+        }//game phase switch
     }//rotation arrow clicked
 
     public void PlayerArmyPlacementComplete() {
         audioControlScript.GeneralButtonClick();
-        if (!animating) {
-            DeselectPreviousSquad();
-            //called from HUD when the player has hit "PlacementComplete" in the HUD, after placing all squads.
-            if (activePlayerID == 0) //first player finished, second player must begin
-                BeginArmyPlacement(1);
-            else //all players finished, ready to start game 
-                RollForTurnOrder();
-        }// !animating
+        DeselectPreviousSquad();
+        //called from HUD when the player has hit "PlacementComplete" in the HUD, after placing all squads.
+        if (activePlayerID == 0) //first player finished, second player must begin
+            BeginArmyPlacement(1);
+        else //all players finished, ready to start game 
+            RollForTurnOrder();
     }//playerArmyPlacementComplete
+
 
 
     /*******************
@@ -774,6 +758,7 @@ public class GameControl : MonoBehaviour {
     }//dice roll end
 
 
+
     /*************
      * UTILITIES *
      *************/
@@ -847,9 +832,17 @@ public class GameControl : MonoBehaviour {
         }
     }
 
-    private void InitializeVariables() {
-        activePlayerID = 0;
+    private bool SquadsAreAnimating() {
+        SquadScript[] allSquads = FindObjectsOfType(typeof(SquadScript)) as SquadScript[];
+        foreach(SquadScript thisSquad in allSquads) {
+            if (thisSquad.IsTheSquadAnimating()) {
+                ConsolePrint(thisSquad.ToString() + " Is animating");
+                return true;
+            }
+        }
+        return false;
     }
+
 
 
     /***************
@@ -859,7 +852,7 @@ public class GameControl : MonoBehaviour {
     private void CheckDebugCommands() {
         if (Input.GetKeyUp(KeyCode.P)) {
             if (currentSelectedSquad != null) {
-                cameraControlScript.EnableCombatCamera(currentSelectedSquad.transform.GetChild(1).gameObject);
+                cameraControlScript.EnableCombatCamera(currentSelectedSquad.gameObject, currentSelectedSquad.gameObject);
             }
         }//p pressed
 
@@ -878,25 +871,28 @@ public class GameControl : MonoBehaviour {
             //move camera to position the next in the current locations array
             cameraControlScript.SetCameraGamePhase("PlayerTwoSetup");
         }
-
-        if (Input.GetKeyUp(KeyCode.Alpha0)) {
-            //quick and dirty fix if aniumation counter fails and play is frozen.
-            animationCount = 0;
-        }
-
+        
         if (Input.GetKeyUp(KeyCode.R)) {
             //move camera to position the next in the current locations array
             DiceRollBegin();
         }
 
         if (Input.GetKeyUp(KeyCode.F)) {
-            //demo code to trigger an animation
-            //demoGuyAnimator.SetTrigger("FlipTrigger");
+            ConsolePrint("Start F response");
+            StartCoroutine(Test());
+            ConsolePrint("End F response");
+
         }
 
     }//check debug commands
 
-    public void ConsolePrint(string message) {
+    private IEnumerator Test() {
+        ConsolePrint("Test Beginning");
+        yield return new WaitForSeconds(2);
+        ConsolePrint("Test Ending");
+    }
+
+    private void ConsolePrint(string message) {
         if (enableDebugging == true) {
             Debug.Log("GameControl - " + message);
         }
@@ -907,7 +903,7 @@ public class GameControl : MonoBehaviour {
         string message = "Squad data - CLICK HERE!! \n" +
             "PlayerID: " + selectedSquadScript.ownerID.ToString() + "\n" +
             "Unit Type: " + selectedSquadScript.soldierClassData.unitClass+ "\n" +
-            "Unit Count: " + selectedSquadScript.soldierClassData.unitsInSquad.ToString() + "\n";
+            "Unit Count: " + selectedSquadScript.unitsRemaining.ToString() + "\n";
         ConsolePrint(message);
     }
 
@@ -944,10 +940,10 @@ public struct CombatData {
         defenderSquadScript = defenderSquad.GetComponent<SquadScript>();
         bonusRollTriggered = false;
         //bonus roll is allowed only if the attacker only throws 1 die, and the defender has 2 health
-        bonusRollEligible = (attackerSquadScript.soldierClassData.GetDiceCount() == 1 && defenderSquadScript.soldierClassData.healthPerUnit == 2);
+        bonusRollEligible = (attackerSquadScript.GetDiceCount() == 1 && defenderSquadScript.soldierClassData.healthPerUnit == 2);
         attackType = attackerSquadScript.soldierClassData.attacksWith;
-        vectorToAttacker = (attackerSquad.transform.position - attackerSquad.transform.position) * -1;
-        diceAvailable = attackerSquadScript.soldierClassData.GetDiceCount();
+        vectorToAttacker = (defenderSquad.transform.position - attackerSquad.transform.position) * -1;
+        diceAvailable = attackerSquadScript.GetDiceCount();
         damageDealt = 0;
         panicDistance = 0;
         panicResult = "None";
@@ -968,7 +964,7 @@ public struct CombatData {
             damageDealt = Mathf.Max(diceData.axeCount, diceData.arrowCount);
 
         //log panic results
-        string attackerPanicBehaviour = attackerSquadScript.soldierClassData.panicBehavior;
+        string attackerPanicBehaviour = attackerSquadScript.soldierClassData.panicDieAction;
         if (diceData.panicCount == diceAvailable && attackerPanicBehaviour == "Standard") {
             panicResult = "AttackerPanics";
             panicDistance = 1;

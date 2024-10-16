@@ -4,8 +4,9 @@ using UnityEngine;
 using UnityEngine.UI;
 
 public class DieSpawner : MonoBehaviour {
-    public int totalDice = 0;
+    //public fields
     public DiceData diceData = new DiceData();
+    //private ields
     [SerializeField] private GameControl gameControlScript;
     [SerializeField] private GameObject[] spawnPointArray;
     private readonly string diePrefabAddress = "Prefabs/Objects/Lionheart_Die";
@@ -119,7 +120,7 @@ public struct DiceData{
     /// <summary>
     /// A method used in order to add the new die result to the tracker and incremement totals
     /// </summary>
-    /// <param name="result">the name of the die face which is being reported: Axe, Arrow, or Panic.</param>
+    /// <param name="result">The name of the die face which is being reported: Axe, Arrow, or Panic.</param>
     /// <returns></returns>
     public void NewResult(string result) {
         results.Add(result);

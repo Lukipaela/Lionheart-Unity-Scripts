@@ -99,23 +99,23 @@ public class CameraControl : MonoBehaviour {
         MoveToNextLocation();
     }   //set camera game phase
 
-    public void EnableCombatCamera(GameObject focalObject) {
-        ConsolePrint("Enabling combat camera with target " + focalObject.name);
+    public void EnableCombatCamera(GameObject attacker, GameObject defender) {
+        ConsolePrint("Enabling combat camera with target " + defender.name);
         //this method switches the camera to perspective mode and moves it to the location of the active combatant
         combatCameraActive = true;
         animating = true;
 
         //identify the object to be tracked by the camera
-        cameraTrackedObject = focalObject;
+        cameraTrackedObject = defender;
 
         //place the combat box based on the input location data 
-        combatCameraBox.transform.position = cameraTrackedObject.transform.position;
-        combatCameraBox.transform.rotation = cameraTrackedObject.transform.rotation;
+        combatCameraBox.transform.position = attacker.transform.position;
+        combatCameraBox.transform.rotation = attacker.transform.rotation;
         //directly relocate the camera to the combat box
         mainCamera.transform.position = combatCameraBox.transform.GetChild(0).transform.position;
         mainCamera.transform.rotation = combatCameraBox.transform.GetChild(0).transform.rotation;
 
-        Quaternion angleToTarget = Quaternion.LookRotation((cameraTrackedObject.transform.position + (cameraTrackedObject.transform.forward * 0.1f) + (cameraTrackedObject.transform.up * 0.6f)) - mainCamera.transform.position);
+        Quaternion angleToTarget = Quaternion.LookRotation((defender.transform.position + (attacker.transform.forward * 0.1f) + (attacker.transform.up * 0.6f)) - mainCamera.transform.position);
         mainCamera.transform.rotation = angleToTarget;
 
         //zoom camera in on action 

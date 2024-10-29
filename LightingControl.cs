@@ -14,63 +14,83 @@ public class LightingControl : MonoBehaviour
     [SerializeField] private float sunRotationSpeed = 4;
     [SerializeField] private float sunAngle = 0;
     [SerializeField] private string dayPhase = "Day"; // Day or Night
+    [SerializeField] private FireScript[] fireSources;
 
-    private readonly bool enableDebugging = true; //switch to enable/disable console logging for this script
+    private readonly bool enableDebugging = false; //switch to enable/disable console logging for this script
+
     /********************
      * BUILT-IN METHODS *
      ********************/
 
-    void Start(){
+    void Start()
+    {
 
     }
 
 
-    void Update(){
+    void Update()
+    {
         float rotationAmount = sunRotationSpeed * Time.deltaTime;
         sunAngle = (sunAngle + rotationAmount) % 360;
         sun.transform.Rotate(new Vector3(rotationAmount, 0, 0));
         //Set Day Phase
-        if (dayPhase == "Day" && sunAngle > 175 && sunAngle < 185)
+        if (dayPhase == "Day" && sunAngle > 125 && sunAngle < 135)
             ChangeDayPhase("Night");
-        else if(dayPhase == "Night" && (sunAngle > 355 || sunAngle < 5))
+        else if (dayPhase == "Night" && (sunAngle > 350 || sunAngle < 0))
             ChangeDayPhase("Day");
     }   //Update
 
 
-    private void ChangeDayPhase( string phase ){
+    private void ChangeDayPhase(string phase)
+    {
         ConsolePrint("Changing day phase to " + phase);
         dayPhase = phase;
-        switch (phase) {
+        switch (phase)
+        {
             case "Day":
+                ToggleFires(false);
                 PlaySound(morningStart, false);
                 break;
             case "Night":
+                ToggleFires(true);
                 PlaySound(nightStart, false);
                 break;
         }//switch
     }//ChangeDayPhase
-
 
     /// <summary>
     /// Stops current sound (if any), and plays the requested track. Optionally can be made to loop.
     /// </summary>
     /// <param name="soundToPlay">The Audio Clip to be played.</param>
     /// <param name="loopTrack">Indicates if the sound should loop indefinitely (until explicitly cancelled by some other process).</param>
-    private void PlaySound(AudioClip soundToPlay, bool loopTrack) {
+    private void PlaySound(AudioClip soundToPlay, bool loopTrack)
+    {
         sunAudioSource.Stop();
         sunAudioSource.loop = loopTrack;
         sunAudioSource.clip = soundToPlay;
         sunAudioSource.Play();
     }
 
-
+    /// <summary>
+    /// Enables/Disables campfire and torch point source lighting and particle effects, and plays a corresponding sound effect.
+    /// Each fire source will be toggled with a different random timing.
+    /// </summary>
+    private void ToggleFires(bool enableEffects)
+    {
+        foreach (FireScript thisFireScript in fireSources)
+        {
+            StartCoroutine(thisFireScript.ToggleEffects(enableEffects));
+        }
+    }
 
     /***************
      * DEBUG STUFF *
      ***************/
 
-    public void ConsolePrint(string message)    {
-        if (enableDebugging == true)        {
+    public void ConsolePrint(string message)
+    {
+        if (enableDebugging == true)
+        {
             Debug.Log("LightingControl - " + message);
         }
     }//console print

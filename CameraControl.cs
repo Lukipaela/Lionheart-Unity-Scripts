@@ -2,7 +2,8 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class CameraControl : MonoBehaviour {
+public class CameraControl : MonoBehaviour
+{
     public GameObject[] diceRollCameraLocations;
     public GameObject[] activeGameCameraLocations;
     public GameObject[] playerOneSetupCameraLocations;
@@ -34,13 +35,15 @@ public class CameraControl : MonoBehaviour {
      * BUILT-IN METHODS *
      ********************/
 
-    void Start() {
+    void Start()
+    {
         gamePhase = "DiceRoll";
         currentLocationIndex = 0;
         targetCamLocation = diceRollCameraLocations[currentLocationIndex];
     }
 
-    void Update() {
+    void Update()
+    {
         if (animating)
             MoveCamera();
     }//update
@@ -50,11 +53,14 @@ public class CameraControl : MonoBehaviour {
      * CUSTOM METHODS *
      ******************/
 
-    private void MoveCamera() {
-        if (!combatCameraActive) {
+    private void MoveCamera()
+    {
+        if (!combatCameraActive)
+        {
             ConsolePrint("Non Combat Camera Update");
             //standard camera rules of motion
-            if (Vector3.Angle(mainCamera.transform.forward, targetCamLocation.transform.forward) > 0.5f || Vector3.Distance(mainCamera.transform.position, targetCamLocation.transform.position) > 0.5) {
+            if (Vector3.Angle(mainCamera.transform.forward, targetCamLocation.transform.forward) > 0.5f || Vector3.Distance(mainCamera.transform.position, targetCamLocation.transform.position) > 0.5)
+            {
                 mainCamera.transform.rotation = Quaternion.Lerp(mainCamera.transform.rotation, targetCamLocation.transform.rotation, Time.deltaTime * cameraRotationSpeed);
                 mainCamera.transform.position = Vector3.Lerp(mainCamera.transform.position, targetCamLocation.transform.position, cameraMoveSpeed * Time.deltaTime);
             }
@@ -63,9 +69,11 @@ public class CameraControl : MonoBehaviour {
         }
     }//move camera
 
-    public void MoveToNextLocation() {
+    public void MoveToNextLocation()
+    {
         ConsolePrint("Cam location toggle command received, cycling to next " + gamePhase + " location");
-        switch (gamePhase) {
+        switch (gamePhase)
+        {
             case "PlayerOneSetup":
                 currentLocationIndex = (currentLocationIndex + 1) % p1SetupCamLocationCount;
                 targetCamLocation = playerOneSetupCameraLocations[currentLocationIndex];
@@ -87,7 +95,8 @@ public class CameraControl : MonoBehaviour {
         animating = true;
     }//move to next location
 
-    public void SetCameraGamePhase(string phase) {
+    public void SetCameraGamePhase(string phase)
+    {
         ConsolePrint("Cam game phase changed to " + phase);
         if (phase == "DiceRoll")
             castleFront.SetActive(false);
@@ -99,7 +108,8 @@ public class CameraControl : MonoBehaviour {
         MoveToNextLocation();
     }   //set camera game phase
 
-    public void EnableCombatCamera(GameObject attacker, GameObject defender) {
+    public void EnableCombatCamera(GameObject attacker, GameObject defender)
+    {
         ConsolePrint("Enabling combat camera with target " + defender.name);
         //this method switches the camera to perspective mode and moves it to the location of the active combatant
         combatCameraActive = true;
@@ -122,7 +132,8 @@ public class CameraControl : MonoBehaviour {
         mainCamera.GetComponent<Camera>().orthographicSize = cameraZoom_combat;
     }//enable combat camera 
 
-    public void DisableCombatCamera() {
+    public void DisableCombatCamera()
+    {
         //this method switches the camera back to ortho mode and moves it to the active game camera location 
         combatCameraActive = false;
         animating = false;
@@ -144,12 +155,15 @@ public class CameraControl : MonoBehaviour {
      * DEBUG STUFF *
      ***************/
 
-    public void ToggleCameraProjection() {
+    public void ToggleCameraProjection()
+    {
         mainCamera.GetComponent<Camera>().orthographic = !mainCamera.GetComponent<Camera>().orthographic;
     }
 
-    public void ConsolePrint(string message) {
-        if (enableDebugging == true) {
+    public void ConsolePrint(string message)
+    {
+        if (enableDebugging == true)
+        {
             Debug.Log("Camera Control - " + message);
         }
     }//console print

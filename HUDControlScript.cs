@@ -6,25 +6,25 @@ using UnityEngine.UI;
 public class HUDControlScript : MonoBehaviour
 {
     //inspector linkages
-    public GameObject squadPlacementPanel;
-    public GameObject messagePanel;
-    public GameObject kingWidget;
-    public GameObject knightWidget;
-    public GameObject infantryWidget;
-    public GameObject archerWidget;
-    public GameObject mercenaryWidget;
-    public GameObject heavyInfantryWidget;
-    public GameObject peasantWidget;
-    public GameObject placementCompleteWidget;
-    public GameControl gameControlScript;
-    public GameObject oldMessageText;
-    public GameObject newMessageText;
-    public GameObject narratorImage;
-    public GameObject turnDataPanel;
-    public GameObject quickMenuPanel;
-    public RectTransform messageBannerLocationVisible;
-    public RectTransform messageBannerLocationHidden;
-    public AudioControl audioControlScript;
+    [SerializeField] private GameObject squadPlacementPanel;
+    [SerializeField] private GameObject messagePanel;
+    [SerializeField] private GameObject turnDataPanel;
+    [SerializeField] private GameObject quickMenuPanel;
+    [SerializeField] private GameObject kingWidget;
+    [SerializeField] private GameObject knightWidget;
+    [SerializeField] private GameObject infantryWidget;
+    [SerializeField] private GameObject archerWidget;
+    [SerializeField] private GameObject mercenaryWidget;
+    [SerializeField] private GameObject heavyInfantryWidget;
+    [SerializeField] private GameObject peasantWidget;
+    [SerializeField] private GameObject placementCompleteWidget;
+    [SerializeField] private RectTransform messageBannerLocationVisible;
+    [SerializeField] private RectTransform messageBannerLocationHidden;
+    [SerializeField] private AudioControl audioControlScript;
+    [SerializeField] private InfoPanelScript infoPanelScript;
+    [SerializeField] private GameControl gameControlScript;
+    [SerializeField] private GameObject newMessageText;
+    [SerializeField] private Sprite[] volumeImages;
 
     //variables for public access
     public string selectedSquadType;
@@ -57,7 +57,7 @@ public class HUDControlScript : MonoBehaviour
     private readonly float messageDuration = 8f;
 
     //debug
-    private readonly bool enableDebugging = false;
+    private readonly bool enableDebugging = true;
 
 
     /********************
@@ -73,33 +73,29 @@ public class HUDControlScript : MonoBehaviour
     {
         if (messageBannerAnimating)
         {
-            //ConsolePrint("Message Board Animation State: " + messageBannerAnimationState);
             switch (messageBannerAnimationState)
             {
                 case "Descending":
                     //move banner toward the 'visible' location
-                    //ConsolePrint("Current Location: " + messageBannerRectTransform.anchoredPosition.ToString() + " target location: " + messageBannerLocationVisible.anchoredPosition.ToString());
-                    messageBannerRectTransform.anchoredPosition = Vector3.MoveTowards(messageBannerRectTransform.anchoredPosition, messageBannerLocationVisible.anchoredPosition, bannerEntrySpeed * Time.deltaTime);
-                    if (messageBannerRectTransform.anchoredPosition == messageBannerLocationVisible.anchoredPosition)
-                            messageBannerAnimationState = "Holding";
+                    messageBannerRectTransform.position = Vector3.MoveTowards(messageBannerRectTransform.position, messageBannerLocationVisible.position, bannerEntrySpeed * Time.deltaTime);
+                    if (messageBannerRectTransform.position == messageBannerLocationVisible.position)
+                        messageBannerAnimationState = "Holding";
                     break;
 
                 case "Holding":
                     bannerAscendTimestamp -= Time.deltaTime;
-                    if(bannerAscendTimestamp < 0)
+                    if (bannerAscendTimestamp < 0)
                         messageBannerAnimationState = "Ascending";
                     break;
 
                 case "Ascending":
                     //move banner toward the 'hidden' location
-                    //ConsolePrint("Current Location: " + messageBannerRectTransform.anchoredPosition.ToString() + " target location: " + messageBannerLocationHidden.anchoredPosition.ToString());
-                    messageBannerRectTransform.anchoredPosition = Vector3.MoveTowards(messageBannerRectTransform.anchoredPosition, messageBannerLocationHidden.anchoredPosition, bannerExitSpeed * Time.deltaTime);
-                    if (messageBannerRectTransform.anchoredPosition == messageBannerLocationHidden.anchoredPosition)
+                    messageBannerRectTransform.position = Vector3.MoveTowards(messageBannerRectTransform.position, messageBannerLocationHidden.position, bannerExitSpeed * Time.deltaTime);
+                    if (messageBannerRectTransform.position == messageBannerLocationHidden.position)
                         messageBannerAnimating = false;
                     break;
             }//animation state switch
         } //banner animating
-
     } //Update
 
 
@@ -107,9 +103,8 @@ public class HUDControlScript : MonoBehaviour
      * CUSTOM METHODS *
      ******************/
 
-    public void InitializeSquadPlacementUI( int playerID )
+    public void InitializeSquadPlacementUI(int playerID)
     {
-
         //enable/show the panel for squad placement. 
         squadPlacementPanel.SetActive(true);
 
@@ -161,13 +156,13 @@ public class HUDControlScript : MonoBehaviour
 
         //potentially disable the special squad types
         mercenaryWidget.transform.GetChild(0).transform.GetChild(0).GetComponent<TMPro.TextMeshProUGUI>().text = "Mercenaries: " + mercenaryCountMax;
-        if(mercenaryCountMax == 0)
+        if (mercenaryCountMax == 0)
             mercenaryWidget.transform.GetChild(0).GetComponent<Button>().interactable = false;
-        
+
         heavyInfantryWidget.transform.GetChild(0).transform.GetChild(0).GetComponent<TMPro.TextMeshProUGUI>().text = "Heavy Infantry: " + heavyInfantryCountMax;
         if (heavyInfantryCountMax == 0)
             heavyInfantryWidget.transform.GetChild(0).GetComponent<Button>().interactable = false;
-        
+
         peasantWidget.transform.GetChild(0).transform.GetChild(0).GetComponent<TMPro.TextMeshProUGUI>().text = "Peasants: " + peasantCountMax;
         if (peasantCountMax == 0)
             peasantWidget.transform.GetChild(0).GetComponent<Button>().interactable = false;
@@ -328,10 +323,9 @@ public class HUDControlScript : MonoBehaviour
         return squadTypeExhausted;
     }//squad was placed
 
-    public void PrintMessage( string message)
+    public void PrintMessage(string message)
     {
         ConsolePrint("Print message received:  " + message);
-        //oldMessageText.GetComponent<TMPro.TextMeshProUGUI>().text = newMessageText.GetComponent<TMPro.TextMeshProUGUI>().text;
         newMessageText.GetComponent<TMPro.TextMeshProUGUI>().text = message;
         messageBannerAnimating = true;
         messageBannerAnimationState = "Descending";
@@ -339,7 +333,7 @@ public class HUDControlScript : MonoBehaviour
         bannerAscendTimestamp = messageDuration;
     }//print message
 
-    public void SetTurnData( int playerID, int AP)
+    public void SetTurnData(int playerID, int AP)
     {
         //child 0 is player name
         turnDataPanel.transform.GetChild(0).GetComponent<TMPro.TextMeshProUGUI>().text = "Turn: " + GameSettings.playerNames[playerID];
@@ -347,10 +341,24 @@ public class HUDControlScript : MonoBehaviour
         turnDataPanel.transform.GetChild(1).GetComponent<TMPro.TextMeshProUGUI>().text = "AP: " + AP;
     }//SetTurnData
 
-    public void SetTurnDataPanelVisibility(bool makeVisible){
+    public void SetTurnDataPanelVisibility(bool makeVisible)
+    {
+        ConsolePrint("Switching turn data panel enabled to: " + makeVisible);
         turnDataPanel.SetActive(makeVisible);
         quickMenuPanel.SetActive(makeVisible);
     }//SetTurnDataPanelVisibility
+
+    public void DismissBanner()
+    {
+
+    }
+
+    public void HideSquadPlacementPanel()
+    {
+        squadPlacementPanel.SetActive(false);
+    }
+
+
 
     /******************
      * BUTTON METHODS *
@@ -420,14 +428,20 @@ public class HUDControlScript : MonoBehaviour
     public void MuteClicked()
     {
         //All logic here is done by the music control script, as the only current actions are to pause/play the theme song
-        audioControlScript.MuteButtonClick();
+        ConsolePrint("Mute button click detected.");
+        if (audioControlScript.MuteButtonClick())
+            quickMenuPanel.transform.GetChild(1).GetComponent<Image>().sprite = volumeImages[1];
+        else
+            quickMenuPanel.transform.GetChild(1).GetComponent<Image>().sprite = volumeImages[0];
     }
 
     public void HelpClicked()
     {
         //bring up a panel of data explaining how each character behaves. (move, rotate, attack, special)
+        ConsolePrint("Help button click detected.");
         audioControlScript.GeneralButtonClick();
         //TODO: Launch help menu panel 
+        infoPanelScript.toggleVisibility();
     }
 
     /***************
@@ -438,7 +452,7 @@ public class HUDControlScript : MonoBehaviour
     {
         if (enableDebugging == true)
         {
-            Debug.Log(message);
+            Debug.Log("HudControlScript: " + message);
         }
     }//console print
 

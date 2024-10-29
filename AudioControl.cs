@@ -2,7 +2,8 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class AudioControl : MonoBehaviour{
+public class AudioControl : MonoBehaviour
+{
     public AudioSource musicSource;
     public AudioSource buttonFXSource;
 
@@ -15,18 +16,22 @@ public class AudioControl : MonoBehaviour{
     private bool bgmEnabled = false;
 
     // Start is called before the first frame update
-    void Start(){
+    void Start()
+    {
         musicSource.volume = GameSettings.bgmVolume;
     }
 
     // Update is called once per frame
-    void Update(){
+    void Update()
+    {
     }
 
-    public void StartMusic(string track){
+    public void StartMusic(string track)
+    {
         //TODO: Add more clips as needed based on number of BGM themes needed 
         // setup, active game, victory? 
-        switch (track){
+        switch (track)
+        {
             case "MainTheme":
                 if (bgmEnabled)
                     musicSource.Play();
@@ -35,26 +40,31 @@ public class AudioControl : MonoBehaviour{
 
     }//StartMusic 
 
-     public void GameOver(){
+    public void GameOver()
+    {
         //plays fanfare sound effect that occurs at gameover 
         buttonFXSource.PlayOneShot(victory);
     }
 
-    public void RotationArrowClick(){
+    public void RotationArrowClick()
+    {
         buttonFXSource.PlayOneShot(rotate);
     }
 
-    public void GeneralButtonClick(){
+    public void GeneralButtonClick()
+    {
         //called when a button is clicked and the input is accepted
         buttonFXSource.PlayOneShot(click);
     }
 
-    public void ErrorClick(){
+    public void ErrorClick()
+    {
         //called when a button is clicked and the input is accepted
         buttonFXSource.PlayOneShot(error);
     }
 
-    public void MuteButtonClick(){
+    public bool MuteButtonClick()
+    {
         //called when the mute button is clicked, toggles BGM
         buttonFXSource.PlayOneShot(click);
         if (bgmEnabled)
@@ -62,6 +72,7 @@ public class AudioControl : MonoBehaviour{
         else
             musicSource.Play();
         bgmEnabled = !bgmEnabled;
+        return bgmEnabled;
     }
 
 }//class

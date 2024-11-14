@@ -19,10 +19,11 @@ public class GameControl : MonoBehaviour
     [SerializeField] private AudioControl audioControlScript;
     [SerializeField] private RotationArrowControl rotationArrowControlScript;
     [SerializeField] private HUDControlScript hudControlScript;
+    [SerializeField] private GameOverPanelScript gameOverPanelScript;
     [SerializeField] private InfoPanelScript infoPanelScript;
     [SerializeField] private DieSpawner dieSpawnerScript;
     [SerializeField] private CameraControl cameraControlScript;
-    private GameObject currentSelectedSquad;
+    public GameObject currentSelectedSquad;
     private string squadToPlacePrefabAddress;
     private string placementState;//indicates if the player is choosing a squad to place, or choosing a location to place a squad: Idle , PlacingSquad
     //variables for determining turn order
@@ -30,11 +31,11 @@ public class GameControl : MonoBehaviour
     private bool diceRollIsValid = false;
     private bool waitingForAttack = false; // a trigger to coordinate the timing of the attack animation and the death animation in a battle 
     private bool waitingForDefense = false; // a trigger to coordinate the timing of the defense animation and the death animation in a battle 
-    private bool actionTaken = false;   //indicates if some ap-consuming action has been taken inm this loop
+    private bool actionTaken = false;   //indicates if some ap-consuming action has been taken in this loop
     private CombatData combatData;
 
     //debug
-    private readonly bool enableDebugging = true; //switch to enable/disable console logging for this script
+    private readonly bool enableDebugging = false; //switch to enable/disable console logging for this script
 
 
 
@@ -51,13 +52,12 @@ public class GameControl : MonoBehaviour
 
         //start up the game
         if (GameSettings.gameMode == "QuickStart")
-            QuickStart();
+            Invoke("QuickStart", 0.1f);
         else
             BeginArmyPlacement(activePlayerID);
 
         //begin BGM based on context
         audioControlScript.StartMusic("MainTheme");
-
     }//start
 
     private void Update()
@@ -140,44 +140,44 @@ public class GameControl : MonoBehaviour
         GameObject nextBoardTile = ReferenceCenterTiles[thisPlayerId];//first row center
         #region
         //infantry
-        CreateAndPlaceSquad(nextBoardTile, thisPlayerId, "Infantry", 4, GameSettings.infantry4PrefabAddress);
+        CreateAndPlaceSquad(nextBoardTile, thisPlayerId, SoldierClass.Infantry, 4, GameSettings.infantry4PrefabAddress);
         nextBoardTile = nextBoardTile.GetComponent<BoardTileScript>().adjacentTileTop;//center + 1
-        CreateAndPlaceSquad(nextBoardTile, thisPlayerId, "Infantry", 4, GameSettings.infantry4PrefabAddress);
+        CreateAndPlaceSquad(nextBoardTile, thisPlayerId, SoldierClass.Infantry, 4, GameSettings.infantry4PrefabAddress);
         nextBoardTile = nextBoardTile.GetComponent<BoardTileScript>().adjacentTileTop;//center + 2
-        CreateAndPlaceSquad(nextBoardTile, thisPlayerId, "Infantry", 4, GameSettings.infantry4PrefabAddress);
+        CreateAndPlaceSquad(nextBoardTile, thisPlayerId, SoldierClass.Infantry, 4, GameSettings.infantry4PrefabAddress);
         nextBoardTile = nextBoardTile.GetComponent<BoardTileScript>().adjacentTileTop;//center + 3
-        CreateAndPlaceSquad(nextBoardTile, thisPlayerId, "Infantry", 4, GameSettings.infantry4PrefabAddress);
+        CreateAndPlaceSquad(nextBoardTile, thisPlayerId, SoldierClass.Infantry, 4, GameSettings.infantry4PrefabAddress);
         nextBoardTile = nextBoardTile.GetComponent<BoardTileScript>().adjacentTileTop;//center + 4
-        CreateAndPlaceSquad(nextBoardTile, thisPlayerId, "Archer", 4, GameSettings.archer4PrefabAddress);
+        CreateAndPlaceSquad(nextBoardTile, thisPlayerId, SoldierClass.Archer, 4, GameSettings.archer4PrefabAddress);
 
         //Mercenaries
         nextBoardTile = ReferenceCenterTiles[thisPlayerId].GetComponent<BoardTileScript>().adjacentTileBottom;//Center - 1
-        CreateAndPlaceSquad(nextBoardTile, thisPlayerId, "Mercenary", 2, GameSettings.mercenary2PrefabAddress);
+        CreateAndPlaceSquad(nextBoardTile, thisPlayerId, SoldierClass.Mercenary, 2, GameSettings.mercenary2PrefabAddress);
 
         //Peasants
         nextBoardTile = nextBoardTile.GetComponent<BoardTileScript>().adjacentTileBottom;//center - 2
-        CreateAndPlaceSquad(nextBoardTile, thisPlayerId, "Peasant", 4, GameSettings.peasant4PrefabAddress);
+        CreateAndPlaceSquad(nextBoardTile, thisPlayerId, SoldierClass.Peasant, 4, GameSettings.peasant4PrefabAddress);
 
         //HeavyInfantry
         nextBoardTile = nextBoardTile.GetComponent<BoardTileScript>().adjacentTileBottom;//center - 3
-        CreateAndPlaceSquad(nextBoardTile, thisPlayerId, "HeavyInfantry", 2, GameSettings.heavyInfantry2PrefabAddress);
+        CreateAndPlaceSquad(nextBoardTile, thisPlayerId, SoldierClass.HeavyInfantry, 2, GameSettings.heavyInfantry2PrefabAddress);
 
 
         //archers
         nextBoardTile = ReferenceCenterTiles[thisPlayerId].GetComponent<BoardTileScript>().adjacentTileRight; //second row center
-        CreateAndPlaceSquad(nextBoardTile, thisPlayerId, "Infantry", 4, GameSettings.infantry4PrefabAddress);
+        CreateAndPlaceSquad(nextBoardTile, thisPlayerId, SoldierClass.Infantry, 4, GameSettings.infantry4PrefabAddress);
         nextBoardTile = nextBoardTile.GetComponent<BoardTileScript>().adjacentTileTop;//center +1
-        CreateAndPlaceSquad(nextBoardTile, thisPlayerId, "Archer", 4, GameSettings.archer4PrefabAddress);
+        CreateAndPlaceSquad(nextBoardTile, thisPlayerId, SoldierClass.Archer, 4, GameSettings.archer4PrefabAddress);
 
         //knights
         nextBoardTile = nextBoardTile.GetComponent<BoardTileScript>().adjacentTileTop;//center +2
-        CreateAndPlaceSquad(nextBoardTile, thisPlayerId, "Knight", 2, GameSettings.knight2PrefabAddress);
+        CreateAndPlaceSquad(nextBoardTile, thisPlayerId, SoldierClass.Knight, 2, GameSettings.knight2PrefabAddress);
         nextBoardTile = nextBoardTile.GetComponent<BoardTileScript>().adjacentTileTop;//center +3
-        CreateAndPlaceSquad(nextBoardTile, thisPlayerId, "Knight", 2, GameSettings.knight2PrefabAddress);
+        CreateAndPlaceSquad(nextBoardTile, thisPlayerId, SoldierClass.Knight, 2, GameSettings.knight2PrefabAddress);
 
         //king
         nextBoardTile = nextBoardTile.GetComponent<BoardTileScript>().adjacentTileTop;//center +4
-        playerScripts[0].kingSquadScript = CreateAndPlaceSquad(nextBoardTile, thisPlayerId, "King", 1, GameSettings.king1PrefabAddress).GetComponent<SquadScript>();
+        playerScripts[0].kingSquadScript = CreateAndPlaceSquad(nextBoardTile, thisPlayerId, SoldierClass.King, 1, GameSettings.king1PrefabAddress).GetComponent<SquadScript>();
 
         #endregion//player 2 instantiation code folder
 
@@ -186,43 +186,43 @@ public class GameControl : MonoBehaviour
         nextBoardTile = ReferenceCenterTiles[thisPlayerId];//first row center
         #region
         //infantry
-        CreateAndPlaceSquad(nextBoardTile, thisPlayerId, "Infantry", 4, GameSettings.infantry4PrefabAddress);
+        CreateAndPlaceSquad(nextBoardTile, thisPlayerId, SoldierClass.Infantry, 4, GameSettings.infantry4PrefabAddress);
         nextBoardTile = nextBoardTile.GetComponent<BoardTileScript>().adjacentTileTop;//center + 1
-        CreateAndPlaceSquad(nextBoardTile, thisPlayerId, "Infantry", 4, GameSettings.infantry4PrefabAddress);
+        CreateAndPlaceSquad(nextBoardTile, thisPlayerId, SoldierClass.Infantry, 4, GameSettings.infantry4PrefabAddress);
         nextBoardTile = nextBoardTile.GetComponent<BoardTileScript>().adjacentTileTop;//center + 2
-        CreateAndPlaceSquad(nextBoardTile, thisPlayerId, "Infantry", 4, GameSettings.infantry4PrefabAddress);
+        CreateAndPlaceSquad(nextBoardTile, thisPlayerId, SoldierClass.Infantry, 4, GameSettings.infantry4PrefabAddress);
         nextBoardTile = nextBoardTile.GetComponent<BoardTileScript>().adjacentTileTop;//center + 3
-        CreateAndPlaceSquad(nextBoardTile, thisPlayerId, "Infantry", 4, GameSettings.infantry4PrefabAddress);
+        CreateAndPlaceSquad(nextBoardTile, thisPlayerId, SoldierClass.Infantry, 4, GameSettings.infantry4PrefabAddress);
         nextBoardTile = nextBoardTile.GetComponent<BoardTileScript>().adjacentTileTop;//center + 4
-        CreateAndPlaceSquad(nextBoardTile, thisPlayerId, "Archer", 4, GameSettings.archer4PrefabAddress);
+        CreateAndPlaceSquad(nextBoardTile, thisPlayerId, SoldierClass.Archer, 4, GameSettings.archer4PrefabAddress);
 
         //Mercenary
         nextBoardTile = ReferenceCenterTiles[thisPlayerId].GetComponent<BoardTileScript>().adjacentTileBottom;//Center - 1
-        CreateAndPlaceSquad(nextBoardTile, thisPlayerId, "Mercenary", 2, GameSettings.mercenary2PrefabAddress);
+        CreateAndPlaceSquad(nextBoardTile, thisPlayerId, SoldierClass.Mercenary, 2, GameSettings.mercenary2PrefabAddress);
 
         //Peasants
         nextBoardTile = nextBoardTile.GetComponent<BoardTileScript>().adjacentTileBottom;//center - 2
-        CreateAndPlaceSquad(nextBoardTile, thisPlayerId, "Peasant", 4, GameSettings.peasant4PrefabAddress);
+        CreateAndPlaceSquad(nextBoardTile, thisPlayerId, SoldierClass.Peasant, 4, GameSettings.peasant4PrefabAddress);
 
         //HeavyInfantry
         nextBoardTile = nextBoardTile.GetComponent<BoardTileScript>().adjacentTileBottom;//center - 3
-        CreateAndPlaceSquad(nextBoardTile, thisPlayerId, "HeavyInfantry", 2, GameSettings.heavyInfantry2PrefabAddress);
+        CreateAndPlaceSquad(nextBoardTile, thisPlayerId, SoldierClass.HeavyInfantry, 2, GameSettings.heavyInfantry2PrefabAddress);
 
         //archers
         nextBoardTile = ReferenceCenterTiles[thisPlayerId].GetComponent<BoardTileScript>().adjacentTileLeft; //second row center
-        CreateAndPlaceSquad(nextBoardTile, thisPlayerId, "Infantry", 4, GameSettings.infantry4PrefabAddress);
+        CreateAndPlaceSquad(nextBoardTile, thisPlayerId, SoldierClass.Infantry, 4, GameSettings.infantry4PrefabAddress);
         nextBoardTile = nextBoardTile.GetComponent<BoardTileScript>().adjacentTileTop;//center +1
-        CreateAndPlaceSquad(nextBoardTile, thisPlayerId, "Archer", 4, GameSettings.archer4PrefabAddress);
+        CreateAndPlaceSquad(nextBoardTile, thisPlayerId, SoldierClass.Archer, 4, GameSettings.archer4PrefabAddress);
 
         //knights
         nextBoardTile = nextBoardTile.GetComponent<BoardTileScript>().adjacentTileTop;//center +2
-        CreateAndPlaceSquad(nextBoardTile, thisPlayerId, "Knight", 2, GameSettings.knight2PrefabAddress);
+        CreateAndPlaceSquad(nextBoardTile, thisPlayerId, SoldierClass.Knight, 2, GameSettings.knight2PrefabAddress);
         nextBoardTile = nextBoardTile.GetComponent<BoardTileScript>().adjacentTileTop;//center +3
-        CreateAndPlaceSquad(nextBoardTile, thisPlayerId, "Knight", 2, GameSettings.knight2PrefabAddress);
+        CreateAndPlaceSquad(nextBoardTile, thisPlayerId, SoldierClass.Knight, 2, GameSettings.knight2PrefabAddress);
 
         //king
         nextBoardTile = nextBoardTile.GetComponent<BoardTileScript>().adjacentTileTop;//center +4
-        playerScripts[1].kingSquadScript = CreateAndPlaceSquad(nextBoardTile, thisPlayerId, "King", 1, GameSettings.king1PrefabAddress).GetComponent<SquadScript>();
+        playerScripts[1].kingSquadScript = CreateAndPlaceSquad(nextBoardTile, thisPlayerId, SoldierClass.King, 1, GameSettings.king1PrefabAddress).GetComponent<SquadScript>();
         #endregion//player 2 instantiation code folder
 
         //final safety cleanup
@@ -300,8 +300,6 @@ public class GameControl : MonoBehaviour
             }
             if (gamePhase != "GameOver")
                 gamePhase = "ActiveGame";
-            else
-                GameOver();
         }
         else
         {
@@ -329,6 +327,26 @@ public class GameControl : MonoBehaviour
         audioControlScript.GameOver();
         gamePhase = "GameOver";
         DeselectPreviousSquad();
+        gameOverPanelScript.toggleVisibility();
+    }
+
+    /// <summary>
+    /// Called if the user clicks Rematch after the conclusion of a game. 
+    /// Initiates a reinitialization of all game parameters and returns to army placement phase. 
+    /// </summary>
+    public void ResetGame()
+    {
+        gameOverPanelScript.toggleVisibility();
+        playerScripts[0].Reset();
+        playerScripts[1].Reset();
+        ClearAllUnits();
+        activePlayerID = 0;
+        if (GameSettings.gameMode == "QuickStart")
+            QuickStart();
+        else
+        {
+            BeginArmyPlacement(activePlayerID);
+        }
     }
 
 
@@ -344,7 +362,7 @@ public class GameControl : MonoBehaviour
         SquadScript elimenatedSquadControlScript = elimenatedSquad.GetComponent<SquadScript>();
         int associatedPlayerID = elimenatedSquadControlScript.ownerID;
         //tell the player a squad was lost
-        playerScripts[associatedPlayerID].SquadLost(elimenatedSquadControlScript.soldierClassData.unitClass);
+        playerScripts[associatedPlayerID].SquadLost(elimenatedSquadControlScript.soldierClassAttributes.soldierClass);
         //tell the tile that the tile is now vacant
         if (elimenatedSquad == currentSelectedSquad)
         {
@@ -358,9 +376,15 @@ public class GameControl : MonoBehaviour
     public void ReportPlayerDefeated(int defeatedPlayerID)
     {
         gamePhase = "GameOver";
-        hudControlScript.PrintMessage("GAME OVER. " + GameSettings.playerNames[(defeatedPlayerID + 1) % 2] + " wins!");
+        DeselectPreviousSquad();
+        hudControlScript.PrintMessage(GameSettings.playerNames[(defeatedPlayerID + 1) % 2] + " wins!");
+        Invoke("GameOver", 5);
     }//Report player defeated
 
+    /// <summary>
+    /// Called by an attacker script in order to signal to the control script that the defender 
+    /// should immediately react (deflect animation or death animation)
+    /// </summary>
     public void ReportAttackHit()
     {
         ConsolePrint("Attack animation start report received");
@@ -438,7 +462,7 @@ public class GameControl : MonoBehaviour
             {
                 yield return new WaitForSeconds(0.1f);
             }
-            combatData.defenderSquadScript.TakeDamage(combatData.damageDealt);
+            combatData.defenderSquadScript.TakeDamage(combatData.damageDealt, combatData.attackerSquadScript.unitSFXLibrary);
 
             //tell any remaining defender units to go back to idle
             yield return new WaitForSeconds(0.5f);
@@ -556,7 +580,7 @@ public class GameControl : MonoBehaviour
                             ConsolePrint("Instantiation object with address: " + squadToPlacePrefabAddress);
                             //create, place, define the squad
                             GameObject newSquad = CreateAndPlaceSquad(selectedBoardTile, activePlayerID, hudControlScript.selectedSquadType, hudControlScript.selectedSquadSize, squadToPlacePrefabAddress);
-                            if (hudControlScript.selectedSquadType == "King")
+                            if (hudControlScript.selectedSquadType == SoldierClass.King)
                             {
                                 ConsolePrint("Assigning king for " + gamePhase);
                                 if (gamePhase == "PlaceArmyP1")
@@ -605,7 +629,7 @@ public class GameControl : MonoBehaviour
                         {//player has clicked on one of their own squad tiles
                             audioControlScript.GeneralButtonClick();
                             currentSelectedSquad = clickedSquad;
-                            infoPanelScript.SetData(currentSelectedSquad.GetComponent<SquadScript>().soldierClassData);
+                            infoPanelScript.SetData(currentSelectedSquad.GetComponent<SquadScript>().soldierClassAttributes);
                             currentSelectedSquad.GetComponent<SquadScript>().SetSelected(true);
                             rotationArrowControlScript.AssignToSquad(currentSelectedSquad);
                         }//player has clicked on one of their own squad tiles
@@ -620,7 +644,7 @@ public class GameControl : MonoBehaviour
                         //clicked tile is empty
                         if (selectedTileControlScript.validMoveTarget)
                         {
-                            int apRequired = currentSelectedSquadScript.soldierClassData.apCostToMove;
+                            int apRequired = currentSelectedSquadScript.soldierClassAttributes.apCostToMove;
                             int apRemaining = playerScripts[activePlayerID].apRemaining;
                             if (apRemaining < apRequired)
                             {
@@ -657,7 +681,7 @@ public class GameControl : MonoBehaviour
                             {
                                 //attack requested
                                 //check if we have enough AP 
-                                int apRequired = currentSelectedSquadScript.soldierClassData.apCostToAttack;
+                                int apRequired = currentSelectedSquadScript.soldierClassAttributes.apCostToAttack;
                                 int apRemaining = playerScripts[activePlayerID].apRemaining;
                                 if (apRemaining < apRequired)
                                 {
@@ -683,7 +707,7 @@ public class GameControl : MonoBehaviour
                             audioControlScript.GeneralButtonClick();
                             DeselectPreviousSquad();
                             currentSelectedSquad = clickedSquad;
-                            infoPanelScript.SetData(currentSelectedSquad.GetComponent<SquadScript>().soldierClassData);
+                            infoPanelScript.SetData(currentSelectedSquad.GetComponent<SquadScript>().soldierClassAttributes);
                             currentSelectedSquad.GetComponent<SquadScript>().SetSelected(true);
                             rotationArrowControlScript.AssignToSquad(currentSelectedSquad);
                         }//player has clicked on one of their own squad tiles
@@ -710,7 +734,7 @@ public class GameControl : MonoBehaviour
                 break;
 
             case "ActiveGame":
-                int apRequired = currentSelectedSquad.GetComponent<SquadScript>().soldierClassData.apCostToRotate;
+                int apRequired = currentSelectedSquad.GetComponent<SquadScript>().soldierClassAttributes.apCostToRotate;
                 int apRemaining = playerScripts[activePlayerID].apRemaining;
                 if (apRemaining < apRequired)
                 {
@@ -785,11 +809,8 @@ public class GameControl : MonoBehaviour
     /// <summary>
     /// Called by the DieSpawner script when all dice have finished rolling and results are ready to be read.
     /// </summary>
-    /// <param name=""></param>
-    /// <returns></returns>
     public void RollCompletedReport()
     {
-        //this method is called by a die when it generates a result. 
         ConsolePrint("Roll completion reported to control script");
         StartCoroutine(DiceRollEnd());
     }
@@ -797,8 +818,6 @@ public class GameControl : MonoBehaviour
     /// <summary>
     /// Called by the RollCompletedReport in order to begin processing the results of a dice roll
     /// </summary>
-    /// <param name=""></param>
-    /// <returns></returns>
     private IEnumerator DiceRollEnd()
     {
         yield return new WaitForSeconds(2f);
@@ -841,6 +860,7 @@ public class GameControl : MonoBehaviour
                 combatData.EvaluateDamage(dieSpawnerScript.diceData);
                 //report the results
                 StartCoroutine(ResolveAttack());
+                hudControlScript.DismissBanner();
                 break;
         }//gamephase switch
     }//dice roll end
@@ -874,7 +894,7 @@ public class GameControl : MonoBehaviour
 
     }//CheckKeyboardCommands
 
-    private GameObject CreateAndPlaceSquad(GameObject boardTile, int playerID, string squadType, int squadSize, string prefabAddress)
+    private GameObject CreateAndPlaceSquad(GameObject boardTile, int playerID, SoldierClass squadType, int squadSize, string prefabAddress)
     {
         GameObject newSquad = Instantiate(Resources.Load<GameObject>(prefabAddress), boardTile.transform.position, boardTile.transform.rotation);
         string orientation = "Right";
@@ -939,14 +959,24 @@ public class GameControl : MonoBehaviour
         {
             if (thisSquad.IsTheSquadAnimating())
             {
-                ConsolePrint(thisSquad.ToString() + " Is animating");
+                //ConsolePrint(thisSquad.ToString() + " Is animating");
                 return true;
             }
         }
         return false;
     }
 
-
+    /// <summary>
+    /// Called by the Reset. Will locate all squad scripts and command them to die, then destroy them, and release their tile.
+    /// </summary>
+    private void ClearAllUnits()
+    {
+        foreach (GameObject thisSquad in GameObject.FindGameObjectsWithTag("Squad"))
+            thisSquad.GetComponent<SquadScript>().Reset();
+        foreach (GameObject thisUnit in GameObject.FindGameObjectsWithTag("Unit"))
+            Destroy(thisUnit, 0.5f);
+        ResetAllTileFlags();
+    }
 
     /***************
      * DEBUG STUFF *
@@ -1009,7 +1039,7 @@ public class GameControl : MonoBehaviour
         SquadScript selectedSquadScript = squad.GetComponent<SquadScript>();
         string message = "Squad data - CLICK HERE!! \n" +
             "PlayerID: " + selectedSquadScript.ownerID.ToString() + "\n" +
-            "Unit Type: " + selectedSquadScript.soldierClassData.unitClass + "\n" +
+            "Unit Type: " + selectedSquadScript.soldierClassAttributes.soldierClass + "\n" +
             "Unit Count: " + selectedSquadScript.unitsRemaining.ToString() + "\n";
         ConsolePrint(message);
     }
@@ -1027,7 +1057,7 @@ public struct CombatData
     public SquadScript defenderSquadScript;
     public bool bonusRollTriggered;
     public bool bonusRollEligible;
-    public string attackType;
+    public DieType attackType;
     public Vector3 vectorToAttacker;
     public int diceAvailable;
     public int damageDealt;
@@ -1040,7 +1070,6 @@ public struct CombatData
     /// </summary>
     /// <param name="newAttackerSquad">The GameObject of the squad which is attacking</param>
     /// <param name="newDefenderSquad">The GameObject of the squad which is defending</param>
-    /// <returns></returns>
     public CombatData(GameObject newAttackerSquad, GameObject newDefenderSquad)
     {
         attackerSquad = newAttackerSquad;
@@ -1049,8 +1078,8 @@ public struct CombatData
         defenderSquadScript = defenderSquad.GetComponent<SquadScript>();
         bonusRollTriggered = false;
         //bonus roll is allowed only if the attacker only throws 1 die, and the defender has 2 health
-        bonusRollEligible = (attackerSquadScript.GetDiceCount() == 1 && defenderSquadScript.soldierClassData.healthPerUnit == 2);
-        attackType = attackerSquadScript.soldierClassData.attacksWith;
+        bonusRollEligible = attackerSquadScript.GetDiceCount() == 1 && defenderSquadScript.soldierClassAttributes.healthPerUnit == 2;
+        attackType = attackerSquadScript.soldierClassAttributes.attacksWith;
         vectorToAttacker = (defenderSquad.transform.position - attackerSquad.transform.position) * -1;
         diceAvailable = attackerSquadScript.GetDiceCount();
         damageDealt = 0;
@@ -1066,26 +1095,26 @@ public struct CombatData
     public void EvaluateDamage(DiceData diceData)
     {
         //log damage results
-        if (attackType == "Axe")
+        if (attackType == DieType.Axe)
             damageDealt = diceData.axeCount;
-        else if (attackType == "Arrow")
+        else if (attackType == DieType.Arrow)
             damageDealt = diceData.arrowCount;
         else //"Any" attacks with whatever die type you roll the most of (Applies to peasants)
             damageDealt = Mathf.Max(diceData.axeCount, diceData.arrowCount);
 
         //log panic results
-        string attackerPanicBehaviour = attackerSquadScript.soldierClassData.panicDieAction;
-        if (diceData.panicCount == diceAvailable && attackerPanicBehaviour == "Standard")
+        PanicDieAction attackerPanicBehaviour = attackerSquadScript.soldierClassAttributes.panicDieAction;
+        if (diceData.panicCount == diceAvailable && attackerPanicBehaviour == PanicDieAction.Standard)
         {
             panicResult = "AttackerPanics";
             panicDistance = 1;
         }
-        else if (diceData.panicCount > 0 && attackerPanicBehaviour == "AlwaysPanic")
+        else if (diceData.panicCount > 0 && attackerPanicBehaviour == PanicDieAction.AlwaysPanic)
         {
             panicResult = "AttackerPanics";
             panicDistance = diceData.panicCount;
         }
-        else if (diceData.panicCount > 0 && attackerPanicBehaviour == "PanicTargets")
+        else if (diceData.panicCount > 0 && attackerPanicBehaviour == PanicDieAction.PanicTargets)
         {
             panicResult = "DefenderPanics";
             panicDistance = diceData.panicCount;

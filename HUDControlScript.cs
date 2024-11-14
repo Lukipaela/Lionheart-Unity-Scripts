@@ -27,7 +27,7 @@ public class HUDControlScript : MonoBehaviour
     [SerializeField] private Sprite[] volumeImages;
 
     //variables for public access
-    public string selectedSquadType;
+    public SoldierClass selectedSquadType;
     public int selectedSquadSize;
 
     //PRIVATE DATA
@@ -57,7 +57,8 @@ public class HUDControlScript : MonoBehaviour
     private readonly float messageDuration = 8f;
 
     //debug
-    private readonly bool enableDebugging = true;
+    private readonly bool enableDebugging = false;
+
 
 
     /********************
@@ -97,6 +98,7 @@ public class HUDControlScript : MonoBehaviour
             }//animation state switch
         } //banner animating
     } //Update
+
 
 
     /******************
@@ -146,7 +148,7 @@ public class HUDControlScript : MonoBehaviour
         //set up the placement complete widget 
         squadsRemaining = kingCountMax + knightCountMax + infantryCountMax + archerCountMax + mercenaryCountMax + heavyInfantryCountMax + peasantCountMax;
         UpdateSquadCountUI();
-        placementCompleteWidget.transform.GetChild(2).GetComponent<Button>().interactable = false;
+        placementCompleteWidget.transform.GetChild(1).GetComponent<Button>().interactable = false;
 
         //set counts for default squad types
         kingWidget.transform.GetChild(0).transform.GetChild(0).GetComponent<TMPro.TextMeshProUGUI>().text = "Kings: " + kingCountMax;
@@ -155,11 +157,11 @@ public class HUDControlScript : MonoBehaviour
         archerWidget.transform.GetChild(0).transform.GetChild(0).GetComponent<TMPro.TextMeshProUGUI>().text = "Archers: " + archerCountMax;
 
         //potentially disable the special squad types
-        mercenaryWidget.transform.GetChild(0).transform.GetChild(0).GetComponent<TMPro.TextMeshProUGUI>().text = "Mercenaries: " + mercenaryCountMax;
+        mercenaryWidget.transform.GetChild(0).transform.GetChild(0).GetComponent<TMPro.TextMeshProUGUI>().text = "Mercs: " + mercenaryCountMax;
         if (mercenaryCountMax == 0)
             mercenaryWidget.transform.GetChild(0).GetComponent<Button>().interactable = false;
 
-        heavyInfantryWidget.transform.GetChild(0).transform.GetChild(0).GetComponent<TMPro.TextMeshProUGUI>().text = "Heavy Infantry: " + heavyInfantryCountMax;
+        heavyInfantryWidget.transform.GetChild(0).transform.GetChild(0).GetComponent<TMPro.TextMeshProUGUI>().text = "Heavy Inf: " + heavyInfantryCountMax;
         if (heavyInfantryCountMax == 0)
             heavyInfantryWidget.transform.GetChild(0).GetComponent<Button>().interactable = false;
 
@@ -230,7 +232,7 @@ public class HUDControlScript : MonoBehaviour
     private void UpdateSquadCountUI()
     {
         //set the label to reflect the new count
-        placementCompleteWidget.transform.GetChild(1).GetComponent<TMPro.TextMeshProUGUI>().text = "Squads Remaining: " + squadsRemaining;
+        placementCompleteWidget.transform.GetChild(0).GetComponent<TMPro.TextMeshProUGUI>().text = "Squads Remaining: " + squadsRemaining;
 
     }
 
@@ -239,7 +241,7 @@ public class HUDControlScript : MonoBehaviour
         //check squad count, if 0, enable button for completion
         if (squadsRemaining == 0)
         {
-            placementCompleteWidget.transform.GetChild(2).GetComponent<Button>().interactable = true;
+            placementCompleteWidget.transform.GetChild(1).GetComponent<Button>().interactable = true;
             DisableButtons();
         }
 
@@ -256,7 +258,7 @@ public class HUDControlScript : MonoBehaviour
         //get count of remaining instances of the selected squad. 
         switch (selectedSquadType)
         {
-            case "King":
+            case SoldierClass.King:
                 kingCountRemaining--;
                 kingWidget.transform.GetChild(0).transform.GetChild(0).GetComponent<TMPro.TextMeshProUGUI>().text = "Kings: " + kingCountRemaining;
                 if (kingCountRemaining == 0)
@@ -264,7 +266,7 @@ public class HUDControlScript : MonoBehaviour
                 else
                     squadTypeExhausted = false;
                 break;
-            case "Archer":
+            case SoldierClass.Archer:
                 archerCountRemaining--;
                 archerWidget.transform.GetChild(0).transform.GetChild(0).GetComponent<TMPro.TextMeshProUGUI>().text = "Archers: " + archerCountRemaining;
                 if (archerCountRemaining == 0)
@@ -272,7 +274,7 @@ public class HUDControlScript : MonoBehaviour
                 else
                     squadTypeExhausted = false;
                 break;
-            case "Knight":
+            case SoldierClass.Knight:
                 knightCountRemaining--;
                 knightWidget.transform.GetChild(0).transform.GetChild(0).GetComponent<TMPro.TextMeshProUGUI>().text = "Knights: " + knightCountRemaining;
                 if (knightCountRemaining == 0)
@@ -280,7 +282,7 @@ public class HUDControlScript : MonoBehaviour
                 else
                     squadTypeExhausted = false;
                 break;
-            case "Infantry":
+            case SoldierClass.Infantry:
                 infantryCountRemaining--;
                 infantryWidget.transform.GetChild(0).transform.GetChild(0).GetComponent<TMPro.TextMeshProUGUI>().text = "Infantry: " + infantryCountRemaining;
                 if (infantryCountRemaining == 0)
@@ -288,23 +290,23 @@ public class HUDControlScript : MonoBehaviour
                 else
                     squadTypeExhausted = false;
                 break;
-            case "HeavyInfantry":
+            case SoldierClass.HeavyInfantry:
                 heavyInfantryCountRemaining--;
-                heavyInfantryWidget.transform.GetChild(0).transform.GetChild(0).GetComponent<TMPro.TextMeshProUGUI>().text = "Heavy Infantry: " + heavyInfantryCountRemaining;
+                heavyInfantryWidget.transform.GetChild(0).transform.GetChild(0).GetComponent<TMPro.TextMeshProUGUI>().text = "Heavy Inf: " + heavyInfantryCountRemaining;
                 if (heavyInfantryCountRemaining == 0)
                     squadTypeExhausted = true;
                 else
                     squadTypeExhausted = false;
                 break;
-            case "Mercenary":
+            case SoldierClass.Mercenary:
                 mercenaryCountRemaining--;
-                mercenaryWidget.transform.GetChild(0).transform.GetChild(0).GetComponent<TMPro.TextMeshProUGUI>().text = "Mercenaries: " + mercenaryCountRemaining;
+                mercenaryWidget.transform.GetChild(0).transform.GetChild(0).GetComponent<TMPro.TextMeshProUGUI>().text = "Mercs: " + mercenaryCountRemaining;
                 if (mercenaryCountRemaining == 0)
                     squadTypeExhausted = true;
                 else
                     squadTypeExhausted = false;
                 break;
-            case "Peasant":
+            case SoldierClass.Peasant:
                 peasantCountRemaining--;
                 peasantWidget.transform.GetChild(0).transform.GetChild(0).GetComponent<TMPro.TextMeshProUGUI>().text = "Peasants: " + peasantCountRemaining;
                 if (peasantCountRemaining == 0)
@@ -350,7 +352,7 @@ public class HUDControlScript : MonoBehaviour
 
     public void DismissBanner()
     {
-
+        messageBannerAnimationState = "Ascending";
     }
 
     public void HideSquadPlacementPanel()
@@ -366,7 +368,7 @@ public class HUDControlScript : MonoBehaviour
 
     public void AddKingClicked()
     {
-        selectedSquadType = "King";
+        selectedSquadType = SoldierClass.King;
         selectedSquadSize = 1;
         AddSquadButtonPressed();
         gameControlScript.DefineSquadToPlaceFromUI(GameSettings.king1PrefabAddress);
@@ -374,7 +376,7 @@ public class HUDControlScript : MonoBehaviour
 
     public void AddKnightClicked()
     {
-        selectedSquadType = "Knight";
+        selectedSquadType = SoldierClass.Knight;
         selectedSquadSize = 2;
         AddSquadButtonPressed();
         gameControlScript.DefineSquadToPlaceFromUI(GameSettings.knight2PrefabAddress);
@@ -382,7 +384,7 @@ public class HUDControlScript : MonoBehaviour
 
     public void AddInfantryClicked()
     {
-        selectedSquadType = "Infantry";
+        selectedSquadType = SoldierClass.Infantry;
         selectedSquadSize = 4;
         AddSquadButtonPressed();
         gameControlScript.DefineSquadToPlaceFromUI(GameSettings.infantry4PrefabAddress);
@@ -390,7 +392,7 @@ public class HUDControlScript : MonoBehaviour
 
     public void AddArcherClicked()
     {
-        selectedSquadType = "Archer";
+        selectedSquadType = SoldierClass.Archer;
         selectedSquadSize = 4;
         AddSquadButtonPressed();
         gameControlScript.DefineSquadToPlaceFromUI(GameSettings.archer4PrefabAddress);
@@ -398,7 +400,7 @@ public class HUDControlScript : MonoBehaviour
 
     public void AddHeavyInfantryClicked()
     {
-        selectedSquadType = "HeavyInfantry";
+        selectedSquadType = SoldierClass.HeavyInfantry;
         selectedSquadSize = 2;
         AddSquadButtonPressed();
         gameControlScript.DefineSquadToPlaceFromUI(GameSettings.heavyInfantry2PrefabAddress);
@@ -406,7 +408,7 @@ public class HUDControlScript : MonoBehaviour
 
     public void AddMercenaryClicked()
     {
-        selectedSquadType = "Mercenary";
+        selectedSquadType = SoldierClass.Mercenary;
         selectedSquadSize = 2;
         AddSquadButtonPressed();
         gameControlScript.DefineSquadToPlaceFromUI(GameSettings.mercenary2PrefabAddress);
@@ -414,7 +416,7 @@ public class HUDControlScript : MonoBehaviour
 
     public void AddPeasantClicked()
     {
-        selectedSquadType = "Peasant";
+        selectedSquadType = SoldierClass.Peasant;
         selectedSquadSize = 4;
         AddSquadButtonPressed();
         gameControlScript.DefineSquadToPlaceFromUI(GameSettings.peasant4PrefabAddress);
@@ -435,14 +437,18 @@ public class HUDControlScript : MonoBehaviour
             quickMenuPanel.transform.GetChild(1).GetComponent<Image>().sprite = volumeImages[0];
     }
 
+    /// <summary>
+    /// Called when the usder clicks the Help button (currently a question mark icon)
+    /// Presents the unit data panel which explains the characteristics of the selected squad's unit class.
+    /// </summary>
     public void HelpClicked()
     {
-        //bring up a panel of data explaining how each character behaves. (move, rotate, attack, special)
         ConsolePrint("Help button click detected.");
         audioControlScript.GeneralButtonClick();
-        //TODO: Launch help menu panel 
         infoPanelScript.toggleVisibility();
     }
+
+
 
     /***************
      * DEBUG STUFF *

@@ -20,6 +20,11 @@ public class InfoPanelScript : MonoBehaviour
     private int panelTransitionSpeed = 1500;
 
 
+
+    /********************
+     * BUILT-IN METHODS *
+     ********************/
+
     // Start is called before the first frame update
     void Start()
     {
@@ -48,13 +53,18 @@ public class InfoPanelScript : MonoBehaviour
     }
 
 
+
+    /******************
+     * CUSTOM METHODS *
+     ******************/
+
     /// <summary>
     /// Fills out the info panel's fields with the data related to the specified unit class.
     /// </summary>
     /// <param name="soldierClass">An object of type SoldierClassData, which contains all of the data related to the selected unit type.</param>
-    public void SetData(SoldierClassData soldierClass)
+    public void SetData(SoldierClassAttributes soldierClass)
     {
-        UnitTypeField.text = "Unit Type: " + soldierClass.unitClass;
+        UnitTypeField.text = "Unit Type: " + soldierClass.soldierClass;
         AttackAPField.text = "AP To Attack: " + soldierClass.apCostToAttack.ToString();
         MoveAPField.text = "AP To Move: " + soldierClass.apCostToMove.ToString();
         RotateAPField.text = "AP To Turn: " + soldierClass.apCostToRotate.ToString();

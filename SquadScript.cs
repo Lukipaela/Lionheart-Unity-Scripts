@@ -7,8 +7,9 @@ public class SquadScript : MonoBehaviour
     public int ownerID;    //which player owns this squad 
     public int orientationIndex;   //corresponds to the orientations array in GameSettings. Indicates which direction this squad is facing
     public GameObject occupiedGameTile; //the tile which this unit is currently standing on 
-    public SoldierClassData soldierClassData;
+    public SoldierClassAttributes soldierClassAttributes;
     public int unitsRemaining;
+    public UnitSFXLibrary unitSFXLibrary;
 
     [SerializeField] private GameControl gameControlScript;
     private bool isSelected = false;
@@ -25,9 +26,11 @@ public class SquadScript : MonoBehaviour
     private List<AnimationTask> animationQueue = new List<AnimationTask>();
     private AnimationTask currentAnimationTask; //holds the details of whichever animation task is currently active
     private List<UnitScript> unitList = new List<UnitScript>();
+    private PlayerScript parentPlayerScript;
 
     //debug
     private static readonly bool enableDebugging = false;
+
 
 
     /********************
@@ -37,6 +40,8 @@ public class SquadScript : MonoBehaviour
     void Start()
     {
         gameControlScript = GameObject.FindGameObjectWithTag("GameControl").GetComponent<GameControl>();
+        if (!parentPlayerScript)
+            parentPlayerScript = gameControlScript.playerScripts[ownerID];
     }
 
     void Update()
@@ -63,16 +68,16 @@ public class SquadScript : MonoBehaviour
      * DAMAGE / LOSS *
      *****************/
 
-    public void TakeDamage(int damage)
+    public void TakeDamage(int damage, UnitSFXLibrary attackerSFXLibrary)
     {
         //total up units lost, requiring 2 damage to kill a large unit, and clamping to a max of UnitsInSquad
-        int unitsLost = Mathf.Min(damage / soldierClassData.healthPerUnit, unitsRemaining);
+        int unitsLost = Mathf.Min(damage / soldierClassAttributes.healthPerUnit, unitsRemaining);
         unitsRemaining -= unitsLost;
 
         for (int i = 0; i < unitList.Count; i++)
         {
             if (i < unitsLost)
-                unitList[i].Die();  //Call directly, unit is halted in block animation and not reading its queue
+                unitList[i].Die(attackerSFXLibrary.getAttackLandSound());  //Call directly, unit is halted in block animation and not reading its queue
             else
                 unitList[i].Deflect(); //Call directly, unit is halted in block animation and not reading its queue
         }
@@ -187,19 +192,19 @@ public class SquadScript : MonoBehaviour
     {
         ConsolePrint(gameObject.name + " Generating attack animation queue.");
         //init local variables
-        switch (soldierClassData.unitClass)
+        switch (soldierClassAttributes.soldierClass)
         {
-            case "Infantry":
-            case "Knight":
-            case "Peasant":
-            case "Mercenary":
+            case SoldierClass.Infantry:
+            case SoldierClass.Knight:
+            case SoldierClass.Peasant:
+            case SoldierClass.Mercenary:
                 Vector3 positionDelta = currentAnimationTask.targetVector - transform.position;
                 foreach (UnitScript thisUnitScript in unitList)
                 {
                     float walkDistance = 0.85f;
-                    if (soldierClassData.unitClass == "Knight")
+                    if (soldierClassAttributes.soldierClass == SoldierClass.Knight)
                         walkDistance = 0.35f;
-                    if (soldierClassData.unitClass == "Mercenary")
+                    if (soldierClassAttributes.soldierClass == SoldierClass.Mercenary)
                         walkDistance = 0.45f;
                     //walk forward to the target's tile, maintaining formation
                     Vector3 thisUnitLocation = thisUnitScript.transform.position;
@@ -217,9 +222,9 @@ public class SquadScript : MonoBehaviour
                 }
                 break;
 
-            case "HeavyInfantry":
-            case "Archer":
-            case "King":
+            case SoldierClass.HeavyInfantry:
+            case SoldierClass.Archer:
+            case SoldierClass.King:
                 Vector3 angleToTarget = currentAnimationTask.targetVector - transform.position;
                 foreach (UnitScript thisUnitScript in unitList)
                 {
@@ -238,7 +243,7 @@ public class SquadScript : MonoBehaviour
 
     public void AnimateSquad(int soldiersToAnimate, string animationType, Vector3 animationVector)
     {
-        ConsolePrint("Animation " + animationType + " requested for " + soldiersToAnimate + " units of type " + soldierClassData.unitClass);
+        ConsolePrint("Animation " + animationType + " requested for " + soldiersToAnimate + " units of type " + soldierClassAttributes.soldierClass);
 
         if (soldiersToAnimate == -1) //default used to mean "all units do this animation"
             soldiersToAnimate = unitList.Count;
@@ -291,10 +296,10 @@ public class SquadScript : MonoBehaviour
         bool continueScanning = true;
         BoardTileScript thisBoardTileScript = occupiedGameTile.GetComponent<BoardTileScript>();
 
-        switch (soldierClassData.unitClass)
+        switch (soldierClassAttributes.soldierClass)
         {
-            case "King"://king and knight have the same movement and atack patterns
-            case "Knight":
+            case SoldierClass.King://king and knight have the same movement and atack patterns
+            case SoldierClass.Knight:
                 bool attackTileAssessed = false;    //used in order to use only the first iteration of the loop to do attack highlighting. this unit can only attack with a range of 1 tile forward.
                 while (continueScanning)
                 {
@@ -310,9 +315,9 @@ public class SquadScript : MonoBehaviour
                 }//loop
                 break;
 
-            case "Infantry":
-            case "Mercenary":
-            case "Peasant":
+            case SoldierClass.Infantry:
+            case SoldierClass.Mercenary:
+            case SoldierClass.Peasant:
                 thisBoardTileScript = ScanNextTile(thisBoardTileScript, orientationIndex);
                 //determine if the next tile has an enemy, if so highlight it.
                 AssessAttackable(thisBoardTileScript);
@@ -320,7 +325,7 @@ public class SquadScript : MonoBehaviour
                 continueScanning = AssessMovable(thisBoardTileScript);
                 break;
 
-            case "HeavyInfantry":
+            case SoldierClass.HeavyInfantry:
                 //heavy infantry code folder
                 #region
                 BoardTileScript forwardBoardTileScript = ScanNextTile(thisBoardTileScript, orientationIndex);
@@ -373,7 +378,7 @@ public class SquadScript : MonoBehaviour
                 #endregion //heavy infantry code folder
                 break;
 
-            case "Archer":
+            case SoldierClass.Archer:
                 //archer code folder
                 #region
                 thisBoardTileScript = ScanNextTile(thisBoardTileScript, orientationIndex);
@@ -528,7 +533,7 @@ public class SquadScript : MonoBehaviour
     }//attack
 
     /// <summary>
-    /// Called by the ghame control when this unit has been told to panic. 
+    /// Called by the game control when this unit has been told to panic. 
     /// Will do nothing if the unit class does not panic. 
     /// Can invoke a chain reaction if it runs into another unit. 
     /// </summary>
@@ -536,9 +541,9 @@ public class SquadScript : MonoBehaviour
     /// <param name="distance">The orientation index along which the retreat should be performed.</param>
     public IEnumerator Panic(int distance, int retreatDirection)
     {
-        ConsolePrint("Squad panicking along orientation index " + retreatDirection + ". Can receive panic: " + soldierClassData.canReceivePanic);
+        ConsolePrint("Squad panicking along orientation index " + retreatDirection + ". Can receive panic: " + soldierClassAttributes.canReceivePanic);
         //if this class of soldier cannot be made to panic, return that value to the caller and perform no followup actions
-        if (soldierClassData.canReceivePanic)
+        if (soldierClassAttributes.canReceivePanic)
         {
             //In case this animation was triggered by this unit's own attacks (peasant), wait for current animations to conclude before proceeding.
             while (IsTheSquadAnimating())
@@ -576,7 +581,7 @@ public class SquadScript : MonoBehaviour
                 else if (nextTileScript.isOccupied)
                 {
                     SquadScript occupyingSquadScript = nextTileScript.occupyingSquad.GetComponent<SquadScript>();
-                    if (occupyingSquadScript.ownerID != this.ownerID || !occupyingSquadScript.soldierClassData.canReceivePanic)
+                    if (occupyingSquadScript.ownerID != this.ownerID || !occupyingSquadScript.soldierClassAttributes.canReceivePanic)
                     {
                         ConsolePrint("Next tile can't be panicked, invoking panic death");
                         PanicDeath(GameSettings.orientations[retreatDirection]);
@@ -699,12 +704,11 @@ public class SquadScript : MonoBehaviour
         {
             if (thisUnit.IsAnimating())
             {
-                ConsolePrint(thisUnit.name + " is animating with " + thisUnit.animationState);
+                //ConsolePrint(thisUnit.name + " is animating with " + thisUnit.animationState);
                 return true;
             }
         }
         return false;
-
     }
 
     /// <summary>
@@ -714,6 +718,8 @@ public class SquadScript : MonoBehaviour
     {
         //check for individual unit animations AND this squad's queue
         if (AreUnitsAnimating() || animationQueue.Count > 0)
+            return true;
+        else if (isRotating || isMoving)
             return true;
         else
             return false;
@@ -727,14 +733,17 @@ public class SquadScript : MonoBehaviour
 
     public int GetDiceCount()
     {
-        return unitsRemaining * soldierClassData.dicePerUnit;
+        return unitsRemaining * soldierClassAttributes.dicePerUnit;
     }//getDiceCount
 
-    public void DefineSquad(int ownerID, string squadType, int unitsInSquad, string facingDirection, GameObject location)
+    /// <summary>
+    /// Called immediately after instantiating a squad, as a pseudo-constructor method.
+    /// </summary>
+    public void DefineSquad(int ownerID, SoldierClass squadType, int unitsInSquad, string facingDirection, GameObject location)
     {
         //called after instantiation, to initialize the tile's parameters (type, count, etc)
         this.ownerID = ownerID;
-        soldierClassData.unitClass = squadType;
+        soldierClassAttributes.soldierClass = squadType;
 
         //all squads are initially placed facing one of two directions, then can later be rotated if desired. 
         if (facingDirection == "Left")
@@ -743,12 +752,73 @@ public class SquadScript : MonoBehaviour
             orientationIndex = 1;
 
         occupiedGameTile = location;
-        soldierClassData.InitializeSquad(squadType);
         unitsRemaining = unitsInSquad;
         //find all units in the squad, put them into a List for future reference
         UnitScript[] unitControlScriptArray = gameObject.GetComponentsInChildren<UnitScript>();
         unitList.AddRange(unitControlScriptArray);
         unitList[unitList.Count - 1].isCaptain = true;
+    }
+
+    /// <summary>
+    /// Called when ending one game and beginning another. Clears the occupied tile reference, and destroys the Squad gameobject
+    /// </summary>
+    public void Reset()
+    {
+        occupiedGameTile.GetComponent<BoardTileScript>().ClearTile();
+        Destroy(gameObject, 0.5f);
+        ConsolePrint("Destroying squad due top Reset");
+    }
+
+    /// <summary>
+    /// Called by a Unit when initializing its voice data. Returns the PlayerScript which corresponds to this squad's team.
+    /// </summary>
+    public PlayerScript GetOwnerPlayerScript()
+    {
+        return gameControlScript.playerScripts[ownerID];
+    }
+
+    public AudioClip GetUnitSoundEffect(string SFXType)
+    {
+        AudioClip returnValue = null;
+        switch (SFXType)
+        {
+            case "AttackHit":
+                returnValue = unitSFXLibrary.getAttackLandSound();
+                break;
+            case "AttackPrimary":
+                returnValue = unitSFXLibrary.getAttackStartSound();
+                break;
+            case "AttackSecondary":
+                returnValue = unitSFXLibrary.getAttackMidSound();
+                break;
+            case "Block":
+                returnValue = unitSFXLibrary.getBlockSound();
+                break;
+            case "Die":
+                if (soldierClassAttributes.soldierClass == SoldierClass.Infantry || soldierClassAttributes.soldierClass == SoldierClass.Archer || soldierClassAttributes.soldierClass == SoldierClass.Peasant)
+                    returnValue = parentPlayerScript.humanSFXLibrary.getSmallUnitDeathSound();
+                else if (soldierClassAttributes.soldierClass == SoldierClass.Knight || soldierClassAttributes.soldierClass == SoldierClass.HeavyInfantry || soldierClassAttributes.soldierClass == SoldierClass.Mercenary)
+                    returnValue = parentPlayerScript.humanSFXLibrary.getLargeUnitDeathSound();
+                else
+                    returnValue = parentPlayerScript.humanSFXLibrary.getKingDeathSound();
+                break;
+            case "Horse":
+                returnValue = parentPlayerScript.humanSFXLibrary.getHorseDeathSound();
+                break;
+            case "Movement":
+                returnValue = unitSFXLibrary.getMovementSound();
+                break;
+            case "Panic":
+                if (soldierClassAttributes.soldierClass == SoldierClass.Infantry || soldierClassAttributes.soldierClass == SoldierClass.Archer || soldierClassAttributes.soldierClass == SoldierClass.Peasant)
+                    returnValue = parentPlayerScript.humanSFXLibrary.getSmallUnitPanicSound();
+                else
+                    returnValue = parentPlayerScript.humanSFXLibrary.getLargeUnitPanicSound();
+                break;
+            case "Selected":
+                returnValue = parentPlayerScript.humanSFXLibrary.getSelectedSound();
+                break;
+        }
+        return returnValue;
     }
 
 
@@ -787,87 +857,6 @@ public class SquadScript : MonoBehaviour
             Debug.Log("Squad Script - Team " + ownerID + ", " + gameObject.name + ": " + message);
     }//console print
 }//class 
-
-/// <summary>
-/// A struct designed to contain the data relavent to a squad consisting of one or more units of the same type.
-/// </summary>
-public struct SoldierClassData
-{
-    public string unitClass;    //Archer, Infantry, Knight, King etc
-    public int apCostToAttack;
-    public int apCostToMove;
-    public int apCostToRotate;
-    public string attacksWith;  //Arrow, Axe, Any(for peasants)
-    public int dicePerUnit;
-    public int healthPerUnit;
-    public string panicDieAction;   //Standard, AlwaysPanic (Peasants), PanicTargets(Mercenary), NeverPanic(King)
-    public bool canReceivePanic;    // indicates if the unit has to react to having panic inflicted on it (either via an attack from a mercenary, or being run into by a panicking squad)
-
-    /// <summary>
-    /// Sets up the squad definition based on which troop type is supplied. Uses default tile definition.
-    /// </summary>
-    /// <param name="soldierClass">Infantry, Archer, Knight, King, Mercenary, HeavyInfantry, or Peasant.</param>
-    /// <param name="startingUnitCount">How many of this type of soldier should be on in the squad to start the game.</param>
-    /// <returns></returns>
-    public void InitializeSquad(string soldierClass)
-    {
-        unitClass = soldierClass;
-        apCostToRotate = 1;
-        if (soldierClass == "Infantry" || soldierClass == "Archer" || soldierClass == "Peasant")
-        {
-            apCostToAttack = 1;
-            apCostToMove = 1;
-            dicePerUnit = 1;
-            healthPerUnit = 1;
-        }
-        else
-        {//knight, king, mercenary, heavyinfantry
-            dicePerUnit = 2;
-            apCostToAttack = 1;
-
-            if (soldierClass == "HeavyInfantry")
-                apCostToMove = 2;
-            else
-                apCostToMove = 1;
-
-            if (soldierClass == "Mercenary")
-                healthPerUnit = 1;
-            else
-                healthPerUnit = 2;
-        }
-
-        //define attacking dice for all units
-        if (soldierClass == "Infantry" || soldierClass == "Mercenary" || soldierClass == "HeavyInfantry" || soldierClass == "King" || soldierClass == "Knight")
-            attacksWith = "Axe";
-        else if (soldierClass == "Archer")
-            attacksWith = "Arrow";
-        else //Peasant
-            attacksWith = "Any";
-
-        //define panic types
-        if (soldierClass == "Infantry" || soldierClass == "Archer" || soldierClass == "HeavyInfantry" || soldierClass == "Knight")
-        {
-            panicDieAction = "Standard";
-            canReceivePanic = true;
-        }
-        else if (soldierClass == "Mercenary")
-        {
-            panicDieAction = "PanicTargets";
-            canReceivePanic = false;
-        }
-        else if (soldierClass == "King")
-        {
-            panicDieAction = "NeverPanic";
-            canReceivePanic = false;
-        }
-        else
-        {//Peasant
-            panicDieAction = "AlwaysPanic";
-            canReceivePanic = true;
-        }
-    }//InitializeSquad method
-
-}//SoldierClassData struct
 
 class AnimationTask
 {

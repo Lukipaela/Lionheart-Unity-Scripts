@@ -14,7 +14,7 @@ public class LightingControl : MonoBehaviour
     [SerializeField] private float sunRotationSpeed = 4;
     [SerializeField] private float sunAngle = 0;
     [SerializeField] private string dayPhase = "Day"; // Day or Night
-    [SerializeField] private FireScript[] fireSources;
+    [SerializeField] private FlameControl[] flameSources;
 
     private readonly bool enableDebugging = false; //switch to enable/disable console logging for this script
 
@@ -24,7 +24,7 @@ public class LightingControl : MonoBehaviour
 
     void Start()
     {
-
+        PlaySound(morningAmbient, true);
     }
 
 
@@ -49,10 +49,12 @@ public class LightingControl : MonoBehaviour
         {
             case "Day":
                 ToggleFires(false);
+                PlaySound(morningAmbient, true);
                 PlaySound(morningStart, false);
                 break;
             case "Night":
                 ToggleFires(true);
+                PlaySound(nightAmbient, true);
                 PlaySound(nightStart, false);
                 break;
         }//switch
@@ -65,10 +67,15 @@ public class LightingControl : MonoBehaviour
     /// <param name="loopTrack">Indicates if the sound should loop indefinitely (until explicitly cancelled by some other process).</param>
     private void PlaySound(AudioClip soundToPlay, bool loopTrack)
     {
-        sunAudioSource.Stop();
-        sunAudioSource.loop = loopTrack;
-        sunAudioSource.clip = soundToPlay;
-        sunAudioSource.Play();
+        if (!loopTrack)
+            sunAudioSource.PlayOneShot(soundToPlay);
+        else
+        {
+            sunAudioSource.Stop();
+            sunAudioSource.loop = loopTrack;
+            sunAudioSource.clip = soundToPlay;
+            sunAudioSource.Play();
+        }
     }
 
     /// <summary>
@@ -77,9 +84,9 @@ public class LightingControl : MonoBehaviour
     /// </summary>
     private void ToggleFires(bool enableEffects)
     {
-        foreach (FireScript thisFireScript in fireSources)
+        foreach (FlameControl thisFlameControl in flameSources)
         {
-            StartCoroutine(thisFireScript.ToggleEffects(enableEffects));
+            StartCoroutine(thisFlameControl.ToggleEffects(enableEffects));
         }
     }
 

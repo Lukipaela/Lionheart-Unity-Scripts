@@ -1,10 +1,8 @@
 using System.Collections;
 using System.Collections.Generic;
-using Unity.VisualScripting;
 using UnityEngine;
-using UnityEngine.Experimental.GlobalIllumination;
 
-public class FireScript : MonoBehaviour
+public class FlameControl : MonoBehaviour
 {
     [SerializeField] private ParticleSystem sparkParticleSystem;
     [SerializeField] private ParticleSystem flameParticleSystem;

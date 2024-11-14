@@ -6,15 +6,11 @@ public class UnitScript : MonoBehaviour
 {
     public bool isCaptain = false;  //captain is designated to play sounds that apply to the whole squad together, like marching sfx and (future) greetings / responses
     public SquadScript parentSquadScript;
+    public string animationState = "Idle";
 
     //animation controls
-    [SerializeField] private AudioSource unitAudioSource;
-    [SerializeField] private AudioClip attackSound;
-    [SerializeField] private AudioClip placementSound;
-    [SerializeField] private AudioClip deathSound;
-    [SerializeField] private AudioClip marchSound;
-    [SerializeField] private AudioClip blockSound;
-    [SerializeField] private AudioClip selectedSound;
+    [SerializeField] private AudioSource oneShotAudioSource;
+    [SerializeField] private AudioSource loopingAudioSource;
     [SerializeField] private SkinnedMeshRenderer bodyMesh;
     [SerializeField] private ParticleSystem bloodParticleSystem;
     [SerializeField] private ParticleSystem sparkParticleSystem;
@@ -24,18 +20,14 @@ public class UnitScript : MonoBehaviour
     private List<AnimationTask> animationQueue = new List<AnimationTask>();
     private AnimationTask currentAnimationTask;
     private bool isDead = false;
-    [SerializeField] public string animationState = "Idle";    //serialized to aid in debugging
+
     //debug
-    private static readonly bool enableDebugging = false;
+    private readonly bool enableDebugging = true;
 
 
     /********************
      * BUILT-IN METHODS *
      ********************/
-
-    void Start()
-    {
-    }
 
     void Update()
     {
@@ -53,15 +45,16 @@ public class UnitScript : MonoBehaviour
             MovementFrameUpdate(currentAnimationTask.targetVector);
         }//moving logic
 
-        if (unitAudioSource.isPlaying && unitAudioSource.clip == marchSound && animationState != "Marching" && animationState != "Rotating" && animationState != "SquadMarching")
-            unitAudioSource.Stop();
-
+        if (loopingAudioSource != null && loopingAudioSource.isPlaying && animationState != "Marching" && animationState != "Rotating" && animationState != "SquadMarching" && isCaptain)
+            loopingAudioSource.Stop();
     }//Update
+
 
 
     /*********************
      * ANIMATION METHODS *
      *********************/
+
     /// <summary>
     /// Should be called by a repeating method (like Update), as it only turns one frame's distance per call.
     /// Rotates the unit toward the specified vector until the unit's Forward vector matches it in direction.
@@ -129,13 +122,13 @@ public class UnitScript : MonoBehaviour
                     else
                         animationState = "Marching";
                     AnimateUnit("March");
-                    StartCoroutine(PlaySound(marchSound, true, true));
+                    StartCoroutine(PlaySound(parentSquadScript.GetUnitSoundEffect("Movement"), useRandomDelay: false, looping: true));
                     break;
 
                 case "Rotate":
                     animationState = "Rotating";
                     AnimateUnit("March");
-                    StartCoroutine(PlaySound(marchSound, true, true));
+                    StartCoroutine(PlaySound(parentSquadScript.GetUnitSoundEffect("Movement"), useRandomDelay: false, looping: true));
                     break;
 
                 case "Attack":
@@ -173,7 +166,6 @@ public class UnitScript : MonoBehaviour
     /// </summary>
     public void Die()
     {
-        unitAudioSource.Stop(); //End marching sound
         //rotate a few degrees around the Y axis at random before animating the death, for variety 
         int rotationAmount = Random.Range(-35, 35); //measured in degrees
         Quaternion rotationToApply = Quaternion.Euler(0f, rotationAmount, 0f);
@@ -181,8 +173,29 @@ public class UnitScript : MonoBehaviour
         //call the death animation, mark unit dead and animating
         bloodParticleSystem.Play();
         AnimateUnit("Die");
-        StartCoroutine(PlaySound(deathSound, true, false));
+        //if the death was that of a knight, also call a horse scream sound effect
+        if (unitClass == "Knight")
+            StartCoroutine(PlaySound(parentSquadScript.GetUnitSoundEffect("Horse")
+                                        , useRandomDelay: true
+                                        , looping: false));
+        StartCoroutine(PlaySound(parentSquadScript.GetUnitSoundEffect("Die")
+                                    , useRandomDelay: true
+                                    , looping: false));
         isDead = true;
+    }//die
+
+    /// <summary>
+    /// An override of Die which contains the attacker's successful hit sound effect. 
+    /// plays that sound effect, then invokes standard Die() mechanics
+    /// </summary>
+    /// <param name="attackerHitSound">An AudioClip of the sound that the attacker's weapon makes on successful hit.</param>
+    public void Die(AudioClip attackerHitSound)
+    {
+        ConsolePrint("Dying due to sound: " + attackerHitSound.name);
+        StartCoroutine(PlaySound(attackerHitSound
+                                    , useRandomDelay: false
+                                    , looping: false));
+        Die();
     }
 
     /// <summary>
@@ -226,18 +239,25 @@ public class UnitScript : MonoBehaviour
     /// <param name="useRandomDelay">Indicates if a small random delay should be imposed before playing the clip. 
     /// This helps prevent all members of the squad from playinmg the same sound at exactly the same moment, stacking the volume.</param>
     /// <param name="loopTrack">Indicates if the sound should loop indefinitely (until explicitly cancelled by some other process).</param>
-    private IEnumerator PlaySound(AudioClip soundToPlay, bool useRandomDelay, bool loopTrack)
+    private IEnumerator PlaySound(AudioClip soundToPlay, bool useRandomDelay, bool looping)
     {
+        ConsolePrint("Playing track: " + soundToPlay.name);
         float delay = 0;
         if (useRandomDelay)
-            delay = Random.Range(0, 0.5f);
+            delay = Random.Range(0.001f, 0.1f);
         yield return new WaitForSeconds(delay);
-        unitAudioSource.Stop();
-        unitAudioSource.loop = loopTrack;
-        unitAudioSource.clip = soundToPlay;
-        if (isCaptain || soundToPlay != marchSound)  //only the captain plays marching sounds
-            unitAudioSource.Play();
-    }
+
+        if (looping)
+        {
+            if (isCaptain)//looping currently only means Marching, and only the captain makes those sounds (else it's chaos)
+            {
+                loopingAudioSource.clip = soundToPlay;
+                loopingAudioSource.Play();
+            }
+        }
+        else
+            oneShotAudioSource.PlayOneShot(soundToPlay);
+    }//PlaySound
 
 
 
@@ -249,26 +269,13 @@ public class UnitScript : MonoBehaviour
     /// Called by the ControlScript when an attacker has reached the AttackHit trigger, and this defender is not being killed.
     /// Plays SFX and activates particle effect.
     /// </summary>
-    /// <param name=""></param>
-    /// <returns></returns>
     public void Deflect()
     {
         ConsolePrint("Deflect called");
         sparkParticleSystem.Play();
-        StartCoroutine(PlaySound(blockSound, true, false));
+        AudioClip soundEffect = parentSquadScript.GetUnitSoundEffect("Block");
+        StartCoroutine(PlaySound(soundToPlay: soundEffect, useRandomDelay: true, looping: false));
         currentAnimationTask = null;
-    }
-
-    /// <summary>
-    /// Called at the exact frame when THIS unit's attack animation would make contact with an enemy. 
-    /// Used in order to send a trigger to the enemy to Die or deflect
-    /// </summary>
-    /// <param name=""></param>
-    /// <returns></returns>
-    public void AttackHit()
-    {
-        ConsolePrint("AttackHit animation event called");
-        parentSquadScript.ReportAttackHit();
     }
 
     /// <summary>
@@ -280,14 +287,41 @@ public class UnitScript : MonoBehaviour
     {
         ConsolePrint("BlockEnd animation event called");
         parentSquadScript.ReportBlockAnimationComplete();
-        unitAudioSource.Stop(); //End marching sound
+        oneShotAudioSource.Stop(); //End marching sound
+    }
+
+    /// <summary>
+    /// Called by the frame of the Attack animation where the weapon makes it's first sound. 
+    /// On most units, this is swinging the weapon. on archers, this is drawing their bow.
+    /// </summary>
+    public void AttackSoundPrimary()
+    {
+        ConsolePrint("AttackSoundPrimary animation event called");
+        StartCoroutine(PlaySound(soundToPlay: parentSquadScript.GetUnitSoundEffect("AttackPrimary")
+                                    , useRandomDelay: true
+                                    , looping: false));
+    }
+
+    public void AttackSoundSecondary()
+    {
+        StartCoroutine(PlaySound(soundToPlay: parentSquadScript.GetUnitSoundEffect("AttackSecondary")
+                                    , useRandomDelay: true
+                                    , looping: false));
+    }
+
+    /// <summary>
+    /// Called at the exact frame when THIS unit's attack animation would make contact with an enemy. 
+    /// Used in order to send a trigger to the enemy to Die or deflect
+    /// </summary>
+    public void AttackHit()
+    {
+        ConsolePrint("AttackHit animation event called");
+        parentSquadScript.ReportAttackHit();
     }
 
     /// <summary>
     /// Called by the final frame of the Attack animation, to indicate that the attacker is now free to return to their home tile/stance.
     /// </summary>
-    /// <param name=""></param>
-    /// <returns></returns>
     public void AttackEnd()
     {
         ConsolePrint("AttackEnd animation event called");
@@ -324,7 +358,7 @@ public class UnitScript : MonoBehaviour
     public void MarchEnd()
     {
         AddIdleTask();
-        unitAudioSource.Stop(); //End marching sound
+        oneShotAudioSource.Stop(); //End marching sound
     }
 
     /// <summary>

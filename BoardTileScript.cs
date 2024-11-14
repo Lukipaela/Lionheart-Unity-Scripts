@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using Unity.VisualScripting;
 using UnityEngine;
 
 public class BoardTileScript : MonoBehaviour
@@ -15,11 +16,10 @@ public class BoardTileScript : MonoBehaviour
     public bool validMoveTarget = false;
     public bool validAttackTarget = false;
 
+    private ParticleSystem attackTargetParticleSystem;
+    private ParticleSystem moveTargetParticleSystem;
+    private ParticleSystem selectedTileParticleSystem;
     private GameControl gameControlScript;
-    private bool selectedEffectOn = false;
-    private bool validMoveTargetEffectOn = false;
-    private bool validAttackTargetEffectOn = false;
-    private Material thisTileMaterial;
 
     private static readonly bool enableDebugging = false;
 
@@ -30,10 +30,13 @@ public class BoardTileScript : MonoBehaviour
 
     private void Start()
     {
-        gameControlScript = GameObject.FindGameObjectWithTag("GameControl").GetComponent<GameControl>();
+        Transform particleSystemCollection = gameObject.transform.Find("BoardTileParticleSystems");
+        attackTargetParticleSystem = particleSystemCollection.Find("AttackParticleSystem").GetComponent<ParticleSystem>();
+        moveTargetParticleSystem = particleSystemCollection.Find("PointerParticleSystem").GetComponent<ParticleSystem>();
+        selectedTileParticleSystem = particleSystemCollection.Find("SelectedParticleSystem").GetComponent<ParticleSystem>();
         isOccupied = false;
         occupyingSquad = null;
-        thisTileMaterial = transform.GetComponent<MeshRenderer>().material;
+        gameControlScript = GameObject.FindGameObjectWithTag("GameControl").GetComponent<GameControl>();
     }//start
 
 
@@ -46,7 +49,6 @@ public class BoardTileScript : MonoBehaviour
         ConsolePrint("clearing tile: " + gameObject.name + " of previous occupying squad: " + occupyingSquad.gameObject.name);
         isOccupied = false;
         occupyingSquad = null;
-        thisTileMaterial.color = GameSettings.defaultBoardTileColor;
         ClearAllHighlights();
     }
 
@@ -56,7 +58,6 @@ public class BoardTileScript : MonoBehaviour
         isOccupied = true;
         occupyingSquad = squadObject;
         EnableHighlight("Selected");
-        //thisTileMaterial.color = GameSettings.playerColors[squadObject.GetComponent<SquadScript>().ownerID];
     }
 
     public void EnableHighlight(string highlightType)
@@ -64,18 +65,16 @@ public class BoardTileScript : MonoBehaviour
         switch (highlightType)
         {
             case "Selected":
-                gameObject.transform.GetChild(0).GetChild(0).GetComponent<ParticleSystem>().Play();
-                selectedEffectOn = true;
+                selectedTileParticleSystem.Play();
                 break;
             case "ValidMoveTarget":
                 validMoveTarget = true;
-                gameObject.transform.GetChild(0).GetChild(1).GetComponent<ParticleSystem>().Play(); //first child call gets the particle system bucket. second gets the individual particle system
-                validMoveTargetEffectOn = true;
+                moveTargetParticleSystem.transform.forward = gameControlScript.currentSelectedSquad.transform.forward * -1;
+                moveTargetParticleSystem.Play();
                 break;
             case "ValidAttackTarget":
                 validAttackTarget = true;
-                gameObject.transform.GetChild(0).GetChild(2).GetComponent<ParticleSystem>().Play(); //first child call gets the particle system bucket. second gets the individual particle system
-                validAttackTargetEffectOn = true;
+                attackTargetParticleSystem.Play();
                 break;
         }//switch highlight type
 
@@ -83,18 +82,17 @@ public class BoardTileScript : MonoBehaviour
 
     public void ClearAllHighlights()
     {
-        selectedEffectOn = false;
-        gameObject.transform.GetChild(0).GetChild(0).GetComponent<ParticleSystem>().Stop();//first child call gets the particle system bucket. second gets the individual particle system
-        gameObject.transform.GetChild(0).GetChild(0).GetComponent<ParticleSystem>().Clear();//first child call gets the particle system bucket. second gets the individual particle system
+        selectedTileParticleSystem.Stop();
+        selectedTileParticleSystem.Clear();
 
         validMoveTarget = false;
-        gameObject.transform.GetChild(0).GetChild(1).GetComponent<ParticleSystem>().Stop();//first child call gets the particle system bucket. second gets the individual particle system
-        gameObject.transform.GetChild(0).GetChild(1).GetComponent<ParticleSystem>().Clear();//first child call gets the particle system bucket. second gets the individual particle system
+        moveTargetParticleSystem.Stop();
+        moveTargetParticleSystem.Clear();
         validMoveTarget = false;
 
         validAttackTarget = false;
-        gameObject.transform.GetChild(0).GetChild(2).GetComponent<ParticleSystem>().Stop();//first child call gets the particle system bucket. second gets the individual particle system
-        gameObject.transform.GetChild(0).GetChild(2).GetComponent<ParticleSystem>().Clear();//first child call gets the particle system bucket. second gets the individual particle system
+        attackTargetParticleSystem.Stop();
+        attackTargetParticleSystem.Clear();
         validAttackTarget = false;
     }//ClearAllHighlights
 

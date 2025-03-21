@@ -14,7 +14,7 @@ public class UnitScript : MonoBehaviour
     [SerializeField] private SkinnedMeshRenderer bodyMesh;
     [SerializeField] private ParticleSystem bloodParticleSystem;
     [SerializeField] private ParticleSystem sparkParticleSystem;
-    [SerializeField] private string unitClass;    //archer, knight, etc
+    [SerializeField] private SoldierClass unitClass;    //archer, knight, etc
     private readonly int rotationSpeed = 3;
     private readonly int movementSpeed = 1;
     private List<AnimationTask> animationQueue = new List<AnimationTask>();
@@ -174,7 +174,7 @@ public class UnitScript : MonoBehaviour
         bloodParticleSystem.Play();
         AnimateUnit("Die");
         //if the death was that of a knight, also call a horse scream sound effect
-        if (unitClass == "Knight")
+        if (unitClass == SoldierClass.Knight)
             StartCoroutine(PlaySound(parentSquadScript.GetUnitSoundEffect("Horse")
                                         , useRandomDelay: true
                                         , looping: false));
@@ -189,7 +189,7 @@ public class UnitScript : MonoBehaviour
     /// plays that sound effect, then invokes standard Die() mechanics
     /// </summary>
     /// <param name="attackerHitSound">An AudioClip of the sound that the attacker's weapon makes on successful hit.</param>
-    public void Die(AudioClip attackerHitSound)
+    public void Die(SoundFile attackerHitSound)
     {
         ConsolePrint("Dying due to sound: " + attackerHitSound.name);
         StartCoroutine(PlaySound(attackerHitSound
@@ -239,9 +239,9 @@ public class UnitScript : MonoBehaviour
     /// <param name="useRandomDelay">Indicates if a small random delay should be imposed before playing the clip. 
     /// This helps prevent all members of the squad from playinmg the same sound at exactly the same moment, stacking the volume.</param>
     /// <param name="loopTrack">Indicates if the sound should loop indefinitely (until explicitly cancelled by some other process).</param>
-    private IEnumerator PlaySound(AudioClip soundToPlay, bool useRandomDelay, bool looping)
+    private IEnumerator PlaySound(SoundFile soundFileToPlay, bool useRandomDelay, bool looping)
     {
-        ConsolePrint("Playing track: " + soundToPlay.name);
+        ConsolePrint("Playing track: " + soundFileToPlay.audioClip.name);
         float delay = 0;
         if (useRandomDelay)
             delay = Random.Range(0.001f, 0.1f);
@@ -251,12 +251,13 @@ public class UnitScript : MonoBehaviour
         {
             if (isCaptain)//looping currently only means Marching, and only the captain makes those sounds (else it's chaos)
             {
-                loopingAudioSource.clip = soundToPlay;
+                loopingAudioSource.clip = soundFileToPlay.audioClip;
+                loopingAudioSource.volume = soundFileToPlay.volume;
                 loopingAudioSource.Play();
             }
         }
         else
-            oneShotAudioSource.PlayOneShot(soundToPlay);
+            oneShotAudioSource.PlayOneShot(soundFileToPlay.audioClip, soundFileToPlay.volume);
     }//PlaySound
 
 
@@ -273,8 +274,8 @@ public class UnitScript : MonoBehaviour
     {
         ConsolePrint("Deflect called");
         sparkParticleSystem.Play();
-        AudioClip soundEffect = parentSquadScript.GetUnitSoundEffect("Block");
-        StartCoroutine(PlaySound(soundToPlay: soundEffect, useRandomDelay: true, looping: false));
+        SoundFile soundEffect = parentSquadScript.GetUnitSoundEffect("Block");
+        StartCoroutine(PlaySound(soundFileToPlay: soundEffect, useRandomDelay: true, looping: false));
         currentAnimationTask = null;
     }
 
@@ -297,14 +298,14 @@ public class UnitScript : MonoBehaviour
     public void AttackSoundPrimary()
     {
         ConsolePrint("AttackSoundPrimary animation event called");
-        StartCoroutine(PlaySound(soundToPlay: parentSquadScript.GetUnitSoundEffect("AttackPrimary")
+        StartCoroutine(PlaySound(soundFileToPlay: parentSquadScript.GetUnitSoundEffect("AttackPrimary")
                                     , useRandomDelay: true
                                     , looping: false));
     }
 
     public void AttackSoundSecondary()
     {
-        StartCoroutine(PlaySound(soundToPlay: parentSquadScript.GetUnitSoundEffect("AttackSecondary")
+        StartCoroutine(PlaySound(soundFileToPlay: parentSquadScript.GetUnitSoundEffect("AttackSecondary")
                                     , useRandomDelay: true
                                     , looping: false));
     }
@@ -338,7 +339,7 @@ public class UnitScript : MonoBehaviour
         ConsolePrint("DeathEnd called");
         //remove this unit from the parent tile's ownership, mark it for future destruction (if not persisting bodies on the field)
         transform.parent = null;
-        if (!GameSettings.persistBodies && unitClass != "King")
+        if (!GameSettings.persistBodies && unitClass != SoldierClass.King)
             Destroy(gameObject, GameSettings.deathLingerDuration);//destroy this object X seconds after it has performed its animation
         currentAnimationTask = null;
     }
@@ -368,13 +369,12 @@ public class UnitScript : MonoBehaviour
     /// </summary>
     public bool IsAnimating()
     {
-        if (unitClass == "King" && currentAnimationTask != null && currentAnimationTask.animationType == "Cheer")
-            return false;   //do not report a progress-blocking animation if it's just the king cheering. 
         if (currentAnimationTask != null || animationQueue.Count > 0)
             return true;
         else
             return false;
     }
+
 
     /***************
      * DEBUG STUFF *

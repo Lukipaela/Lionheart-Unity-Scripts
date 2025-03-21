@@ -37,7 +37,6 @@ public class CameraControl : MonoBehaviour
 
     void Start()
     {
-        gamePhase = "DiceRoll";
         currentLocationIndex = 0;
         targetCamLocation = diceRollCameraLocations[currentLocationIndex];
     }
@@ -59,7 +58,7 @@ public class CameraControl : MonoBehaviour
         {
             ConsolePrint("Non Combat Camera Update");
             //standard camera rules of motion
-            if (Vector3.Angle(mainCamera.transform.forward, targetCamLocation.transform.forward) > 0.5f || Vector3.Distance(mainCamera.transform.position, targetCamLocation.transform.position) > 0.5)
+            if (Vector3.Angle(mainCamera.transform.forward, targetCamLocation.transform.forward) > 0.1f || Vector3.Distance(mainCamera.transform.position, targetCamLocation.transform.position) > 0.5)
             {
                 mainCamera.transform.rotation = Quaternion.Lerp(mainCamera.transform.rotation, targetCamLocation.transform.rotation, Time.deltaTime * cameraRotationSpeed);
                 mainCamera.transform.position = Vector3.Lerp(mainCamera.transform.position, targetCamLocation.transform.position, cameraMoveSpeed * Time.deltaTime);

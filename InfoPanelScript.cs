@@ -4,6 +4,7 @@ using UnityEngine;
 
 public class InfoPanelScript : MonoBehaviour
 {
+    public PanelHider panelHider;
 
     [SerializeField] private TMPro.TextMeshProUGUI UnitTypeField;
     [SerializeField] private TMPro.TextMeshProUGUI AttackAPField;
@@ -13,11 +14,6 @@ public class InfoPanelScript : MonoBehaviour
     [SerializeField] private TMPro.TextMeshProUGUI DicePerAttackField;
     [SerializeField] private TMPro.TextMeshProUGUI HealthPerUnitField;
     [SerializeField] private TMPro.TextMeshProUGUI PanicBehaviourField;
-    [SerializeField] private Transform Location_Hidden;
-    [SerializeField] private Transform Location_Active;
-    [SerializeField] private Transform infoPanel;
-    private string animationState = "Hidden";
-    private int panelTransitionSpeed = 1500;
 
 
 
@@ -28,28 +24,13 @@ public class InfoPanelScript : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
-
+        panelHider = new PanelHider(transform.GetChild(1).position, transform.GetChild(2).position, transform.GetChild(0).GetComponent<RectTransform>(), 1500);
     }
 
     // Update is called once per frame
     void Update()
     {
-        switch (animationState)
-        {
-            case "Activating":
-                infoPanel.position = Vector3.MoveTowards(infoPanel.position, Location_Active.position, panelTransitionSpeed * Time.deltaTime);
-                if (infoPanel.position == Location_Active.position)
-                    animationState = "Active";
-                break;
-
-            case "Hiding":
-                infoPanel.position = Vector3.MoveTowards(infoPanel.position, Location_Hidden.position, panelTransitionSpeed * Time.deltaTime);
-                if (infoPanel.position == Location_Hidden.position)
-                    animationState = "Hidden";
-                break;
-
-            default: break;
-        }//animation state switch
+        panelHider.ManualUpdate();
     }
 
 
@@ -74,21 +55,4 @@ public class InfoPanelScript : MonoBehaviour
         PanicBehaviourField.text = "Panic Action: " + soldierClass.panicDieAction.ToString();
     }
 
-    /// <summary>
-    /// Switches the info panel between active and inactive, sliding it onto and off of the screen. 
-    /// </summary>
-    public void toggleVisibility()
-    {
-        switch (animationState)
-        {
-            case "Active":
-            case "Activating":
-                animationState = "Hiding";
-                break;
-            case "Hidden":
-            case "Hiding":
-                animationState = "Activating";
-                break;
-        }//animation state switch
-    }//toggle visibility
 }//class

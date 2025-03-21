@@ -5,17 +5,11 @@ using UnityEngine;
 
 public class GameOverPanelScript : MonoBehaviour
 {
+    public PanelHider panelHider;
 
     //inspector linkages
     [SerializeField] private GameControl gameControlScript;
     [SerializeField] private AudioControl audioControlScript;
-    [SerializeField] private Transform Location_Hidden;
-    [SerializeField] private Transform Location_Active;
-    [SerializeField] private Transform gameOverPanel;
-
-    //private vars
-    private string animationState = "Hidden";
-    private int panelTransitionSpeed = 1500;
 
     //debug
     private readonly bool enableDebugging = true;
@@ -27,29 +21,13 @@ public class GameOverPanelScript : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
-
+        panelHider = new PanelHider(transform.GetChild(1).position, transform.GetChild(2).position, transform.GetChild(0).GetComponent<RectTransform>(), 1500);
     }
 
     // Update is called once per frame
     void Update()
     {
-        switch (animationState)
-        {
-            case "Activating":
-                gameOverPanel.position = Vector3.MoveTowards(gameOverPanel.position, Location_Active.position, panelTransitionSpeed * Time.deltaTime);
-                if (gameOverPanel.position == Location_Active.position)
-                    animationState = "Active";
-                break;
-
-            case "Hiding":
-                gameOverPanel.position = Vector3.MoveTowards(gameOverPanel.position, Location_Hidden.position, panelTransitionSpeed * Time.deltaTime);
-                if (gameOverPanel.position == Location_Hidden.position)
-                    animationState = "Hidden";
-                break;
-
-            default: break;
-        }//animation state switch
-
+        panelHider.ManualUpdate();
     }
 
 
@@ -80,26 +58,6 @@ public class GameOverPanelScript : MonoBehaviour
         gameControlScript.ResetGame();
     }
 
-
-
-    /// <summary>
-    /// Switches the info panel between active and inactive, sliding it onto and off of the screen. 
-    /// </summary>
-    public void toggleVisibility()
-    {
-        ConsolePrint("Toggling visibility.");
-        switch (animationState)
-        {
-            case "Active":
-            case "Activating":
-                animationState = "Hiding";
-                break;
-            case "Hidden":
-            case "Hiding":
-                animationState = "Activating";
-                break;
-        }//animation state switch
-    }//toggle visibility
 
 
     /***************

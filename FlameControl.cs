@@ -8,27 +8,9 @@ public class FlameControl : MonoBehaviour
     [SerializeField] private ParticleSystem flameParticleSystem;
     [SerializeField] private Light fireLight;
     [SerializeField] private AudioSource audioSource;
-    [SerializeField] private AudioClip flameOnSound;
-    [SerializeField] private AudioClip flameOffSound;
+    [SerializeField] private FlameSFXLibrary flameSFXLibrary;
 
-    private readonly bool enableDebugging = true; //switch to enable/disable console logging for this script
-
-
-    /********************
-     * BUILT-IN METHODS *
-     ********************/
-
-    // Start is called before the first frame update
-    void Start()
-    {
-
-    }
-
-    // Update is called once per frame
-    void Update()
-    {
-
-    }
+    private readonly bool enableDebugging = false; //switch to enable/disable console logging for this script
 
 
 
@@ -36,6 +18,12 @@ public class FlameControl : MonoBehaviour
      * CUSTOM METHODS *
      ******************/
 
+    /// <summary>
+    /// Called LightingControl script when transitioning between Day and Night. 
+    /// After a random delay, initiates a sound effect and toggles lights according to new time of day.
+    /// </summary>
+    /// <param name="enableEffects">If true, signals that Night has arrived, and the fire effects should be turned on.
+    /// If false, signals that Day has arrived, and fire effects should be disabled.</param>
     public IEnumerator ToggleEffects(bool enableEffects)
     {
         float delay = Random.Range(0, 2.5f);
@@ -45,14 +33,16 @@ public class FlameControl : MonoBehaviour
             sparkParticleSystem.Play();
             flameParticleSystem.Play();
             fireLight.enabled = true;
-            audioSource.PlayOneShot(flameOnSound);
+            SoundFile igniteSound = flameSFXLibrary.getIgnitionSound();
+            audioSource.PlayOneShot(igniteSound.audioClip, igniteSound.volume);
         }   //on
         else
         {
             sparkParticleSystem.Stop();
             flameParticleSystem.Stop();
             fireLight.enabled = false;
-            audioSource.PlayOneShot(flameOffSound);
+            SoundFile extinguishSound = flameSFXLibrary.getExtinguishSound();
+            audioSource.PlayOneShot(extinguishSound.audioClip, extinguishSound.volume);
         }   //off
     }//ToggleEffects
 
@@ -67,6 +57,5 @@ public class FlameControl : MonoBehaviour
             Debug.Log("FireScript - " + this.name + ": " + message);
         }
     }//console print
-
 
 }

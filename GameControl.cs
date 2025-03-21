@@ -3,13 +3,13 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor;
 using UnityEngine.UI;
+using Unity.VisualScripting;
 
 
-[InitializeOnLoad]  //this property will build the library as soon as unity launches, reducing overhead during the game.
 public class GameControl : MonoBehaviour
 {
     // PUBLIC VARS
-    public string gamePhase;    //PlaceArmyP1, PlaceArmyP2, DiceRoll, ActiveGame, GameOver, RollForFirst
+    public GamePhase gamePhase;    //PlaceArmyP1, PlaceArmyP2, DiceRoll, ActiveGame, GameOver, RollForFirst
     public int activePlayerID = 0;
     public PlayerScript[] playerScripts;
 
@@ -33,9 +33,9 @@ public class GameControl : MonoBehaviour
     private bool waitingForDefense = false; // a trigger to coordinate the timing of the defense animation and the death animation in a battle 
     private bool actionTaken = false;   //indicates if some ap-consuming action has been taken in this loop
     private CombatData combatData;
-
+    private ObjectHider armyHider;
     //debug
-    private readonly bool enableDebugging = false; //switch to enable/disable console logging for this script
+    private readonly bool enableDebugging = true; //switch to enable/disable console logging for this script
 
 
 
@@ -45,29 +45,39 @@ public class GameControl : MonoBehaviour
 
     private void Start()
     {
+        hudControlScript.ToggleDiceRollButtonVisibility();
         ConsolePrint("Start called with Game Mode: " + GameSettings.gameMode);
 
         //initialize random seed
         Random.InitState(System.Environment.TickCount);
 
         //start up the game
-        if (GameSettings.gameMode == "QuickStart")
+        if (GameSettings.gameMode == GameMode.QuickStart)
             Invoke("QuickStart", 0.1f);
         else
             BeginArmyPlacement(activePlayerID);
 
         //begin BGM based on context
         audioControlScript.StartMusic("MainTheme");
+
+        // find and store Army Hider object
+        Transform armyHiderCollection = GameObject.FindGameObjectWithTag("ArmyHider").transform;
+        armyHider = new ObjectHider(armyHiderCollection.GetChild(1).position, armyHiderCollection.GetChild(2).position, armyHiderCollection.GetChild(0), 200);
+
+        //initialize the time of day
+        lightControlScript.SetTimeCycleMode(GameSettings.timeCycleMode);
     }//start
 
     private void Update()
     {
         CheckKeyboardCommands();
         //check on the animation status to potentially release the controls 
-        if (!SquadsAreAnimating() && gamePhase == "ActiveGame" && actionTaken)
+        if (!SquadsAreAnimating() && gamePhase == GamePhase.Active && actionTaken)
         {
             ActionComplete();
         }
+
+        armyHider.ManualUpdate();
     }//Update
 
 
@@ -131,7 +141,7 @@ public class GameControl : MonoBehaviour
     private void QuickStart()
     {
         //This method is used so that units will be automatically placed on the board, for debug testing. 
-        gamePhase = "QuickStart";
+        gamePhase = GamePhase.QuickStart;
         //disable the unit placement hud
         hudControlScript.HideSquadPlacementPanel();
 
@@ -239,7 +249,7 @@ public class GameControl : MonoBehaviour
         if (playerID == 0)
         {
             activePlayerID = 0;
-            gamePhase = "PlaceArmyP1";
+            gamePhase = GamePhase.PlaceArmyP1;
             placementState = "Idle";
             StartCoroutine(AnimateCamera("PlayerOneSetup", true));
             hudControlScript.InitializeSquadPlacementUI(activePlayerID);
@@ -247,7 +257,7 @@ public class GameControl : MonoBehaviour
         else if (playerID == 1)
         {
             activePlayerID = 1;
-            gamePhase = "PlaceArmyP2";
+            gamePhase = GamePhase.PlaceArmyP2;
             placementState = "Idle";
             StartCoroutine(AnimateCamera("PlayerTwoSetup", true));
             hudControlScript.InitializeSquadPlacementUI(activePlayerID);
@@ -258,7 +268,7 @@ public class GameControl : MonoBehaviour
     private void BeginGame()
     {
         ConsolePrint("Beginning Game");
-        gamePhase = "ActiveGame";
+        gamePhase = GamePhase.Active;
         StartCoroutine(AnimateCamera("ActiveGame", false));
         //after both teams have been rendered, update their soldier's skin tones to match the team they belong to.
         AssignTeamColors();
@@ -271,40 +281,52 @@ public class GameControl : MonoBehaviour
 
     private void ActionComplete()
     {
-        ConsolePrint("Action complete called for Player " + activePlayerID + " with " + playerScripts[activePlayerID].apRemaining + " AP Remaining");
+        ConsolePrint("Action complete called for Player " + activePlayerID
+                        + " (" + GameSettings.playerNames[activePlayerID]
+                        + ") with " + playerScripts[activePlayerID].apRemaining
+                        + " AP Remaining, in game phase " + gamePhase);
         actionTaken = false;
 
-        if (gamePhase != "PlaceArmyP1" && gamePhase != "PlaceArmyP2")
+        switch (gamePhase)
         {
-            //reenable the hud, in case it was hidden for diceroll/animation
-            hudControlScript.SetTurnDataPanelVisibility(true);
-            hudControlScript.SetTurnData(activePlayerID, playerScripts[activePlayerID].apRemaining);
-
-            //reset all tile highlight effects and attackable/movable flags
-            ResetAllTileFlags();
-
-            if (cameraControlScript.combatCameraActive)
-                cameraControlScript.DisableCombatCamera();
-
-            //called after animations end, to  see if the turn is over. 
-            if (playerScripts[activePlayerID].apRemaining == 0)
-            {
-                EndTurn();
-            }
-            else if (currentSelectedSquad != null)
-            {
-                //reapply the arrows if a squad is still selected, and the turn is not over.
+            case GamePhase.PlaceArmyP1:
+            case GamePhase.PlaceArmyP2:
+                //the only animation in army placement is the squad relocation mechanic. 
                 rotationArrowControlScript.AssignToSquad(currentSelectedSquad);
-                currentSelectedSquad.GetComponent<SquadScript>().EnableActionHighlights();
-                currentSelectedSquad.GetComponent<SquadScript>().SetSelected(true);
-            }
-            if (gamePhase != "GameOver")
-                gamePhase = "ActiveGame";
-        }
-        else
-        {
-            //the only animation in army placement is the squad relocation mechanic. 
-            rotationArrowControlScript.AssignToSquad(currentSelectedSquad);
+                break;
+            case GamePhase.Active:
+            case GamePhase.Attacking:
+            case GamePhase.QuickStart:
+            case GamePhase.RollForFirst:
+                //reenable the hud, in case it was hidden for diceroll/animation
+                hudControlScript.SetTurnDataPanelVisibility(true);
+                hudControlScript.SetInfoPanelVisibility(true);
+                hudControlScript.SetTurnData(activePlayerID, playerScripts[activePlayerID].apRemaining);
+
+                //reset all tile highlight effects and attackable/movable flags
+                ResetAllTileFlags();
+
+                if (cameraControlScript.combatCameraActive)
+                    cameraControlScript.DisableCombatCamera();
+
+                //called after animations end, to  see if the turn is over. 
+                if (playerScripts[activePlayerID].apRemaining == 0)
+                {
+                    EndTurn();
+                }
+                else if (currentSelectedSquad != null)
+                {
+                    //reapply the arrows if a squad is still selected, and the turn is not over.
+                    rotationArrowControlScript.AssignToSquad(currentSelectedSquad);
+                    currentSelectedSquad.GetComponent<SquadScript>().EnableActionHighlights();
+                    currentSelectedSquad.GetComponent<SquadScript>().SetSelected(true);
+                }
+                gamePhase = GamePhase.Active;
+                break;
+            case GamePhase.GameOver:
+                //reset all tile highlight effects and attackable/movable flags
+                ResetAllTileFlags();
+                break;
         }
     }//action complete
 
@@ -323,11 +345,13 @@ public class GameControl : MonoBehaviour
 
     public void GameOver()
     {
+        ConsolePrint("GameOver called.");
         //play sfx for gameover 
         audioControlScript.GameOver();
-        gamePhase = "GameOver";
+        gamePhase = GamePhase.GameOver;
         DeselectPreviousSquad();
-        gameOverPanelScript.toggleVisibility();
+        gameOverPanelScript.panelHider.ToggleVisibility();
+        lightControlScript.SetTimeCycleMode(TimeCycleMode.Pause);
     }
 
     /// <summary>
@@ -336,12 +360,14 @@ public class GameControl : MonoBehaviour
     /// </summary>
     public void ResetGame()
     {
-        gameOverPanelScript.toggleVisibility();
+        ConsolePrint("ResetGame called.");
+        gameOverPanelScript.panelHider.ToggleVisibility();
         playerScripts[0].Reset();
         playerScripts[1].Reset();
         ClearAllUnits();
+        lightControlScript.SetTimeCycleMode(GameSettings.timeCycleMode);    //restart time cycling, as this paused during gameover
         activePlayerID = 0;
-        if (GameSettings.gameMode == "QuickStart")
+        if (GameSettings.gameMode == GameMode.QuickStart)
             QuickStart();
         else
         {
@@ -375,7 +401,8 @@ public class GameControl : MonoBehaviour
 
     public void ReportPlayerDefeated(int defeatedPlayerID)
     {
-        gamePhase = "GameOver";
+        ConsolePrint("Player Defeated report received.");
+        gamePhase = GamePhase.GameOver;
         DeselectPreviousSquad();
         hudControlScript.PrintMessage(GameSettings.playerNames[(defeatedPlayerID + 1) % 2] + " wins!");
         Invoke("GameOver", 5);
@@ -409,18 +436,23 @@ public class GameControl : MonoBehaviour
     private void Attack(GameObject attacker, GameObject defender, bool isBonusRoll)
     {
         ConsolePrint("Initiating attack.");
-        gamePhase = "Attacking";
+        gamePhase = GamePhase.Attacking;
         hudControlScript.SetTurnDataPanelVisibility(false);
+        hudControlScript.SetInfoPanelVisibility(false);
         diceRollIsValid = true;
-
+        hudControlScript.ToggleDiceRollButtonVisibility();
         if (!isBonusRoll)
         {
+            ConsolePrint("Not a bonus roll.");
             //create combat object to house related data  if not a reroll
             combatData = new CombatData(attacker, defender);
             hudControlScript.PrintMessage(GameSettings.playerNames[activePlayerID] + " - Press SPACE to roll when ready. Attacking with " + combatData.attackType + " dice.");
         }
         else
+        {
             hudControlScript.PrintMessage("Bonus roll earned! Roll successfully a second time to kill the armored target.");
+            ConsolePrint("Bonus roll attack beginning.");
+        }
 
         StartCoroutine(AnimateCamera("DiceRoll", true));
     }//attack
@@ -430,15 +462,17 @@ public class GameControl : MonoBehaviour
         ConsolePrint("Resolving attack dealing " + combatData.damageDealt + " damage, with " + dieSpawnerScript.diceData.panicCount + " panics rolled.");
 
         //handle bonus rolls
-        if (combatData.bonusRollTriggered == true)
+        if (combatData.bonusRollEarned == true)
         { //the bonus roll deals double damage, as it means that this is the second throw for a small unit against a large
-            ConsolePrint("Bonus attack success, doubling damage.");
+            ConsolePrint("Bonus attack processed, doubling any damage.");
             combatData.damageDealt *= 2;
+            combatData.bonusRollEarned = false;
+            dieSpawnerScript.diceData.panicCount = 0;   //panics do not apply on the bonus roll
         }
         else if (combatData.damageDealt == 1 && combatData.bonusRollEligible)
         {
             ConsolePrint("Bonus roll earned.");
-            combatData.bonusRollTriggered = true;
+            combatData.bonusRollEarned = true;
             combatData.bonusRollEligible = false;   //prevent a second bonus roll
             combatData.damageDealt = 0; //do no damage on this roll, perform bonus roll instead
         }
@@ -492,14 +526,17 @@ public class GameControl : MonoBehaviour
         }//if defenders remain
 
         //return the camera/gamePhase to active if no bonus roll earned, signifying end of action.
-        if (!combatData.bonusRollTriggered)
+        if (!combatData.bonusRollEarned)
         {
             while (SquadsAreAnimating())
             {
                 yield return new WaitForSeconds(0.1f);
             }
-            StartCoroutine(AnimateCamera("ActiveGame", true));
-            gamePhase = "ActiveGame";
+            if (gamePhase != GamePhase.GameOver)
+            {
+                StartCoroutine(AnimateCamera("ActiveGame", true));
+                gamePhase = GamePhase.Active;
+            }
         }
         else //trigger a repeat attack roll, classified as a "bonus"
             Attack(combatData.attackerSquad, combatData.defenderSquad, true);
@@ -527,8 +564,8 @@ public class GameControl : MonoBehaviour
         BoardTileScript selectedTileControlScript = selectedBoardTile.GetComponent<BoardTileScript>();
         switch (gamePhase)
         {
-            case "PlaceArmyP1":
-            case "PlaceArmyP2":
+            case GamePhase.PlaceArmyP1:
+            case GamePhase.PlaceArmyP2:
                 #region
                 if (placementState == "Idle")
                 {
@@ -583,14 +620,14 @@ public class GameControl : MonoBehaviour
                             if (hudControlScript.selectedSquadType == SoldierClass.King)
                             {
                                 ConsolePrint("Assigning king for " + gamePhase);
-                                if (gamePhase == "PlaceArmyP1")
+                                if (gamePhase == GamePhase.PlaceArmyP1)
                                     playerScripts[0].kingSquadScript = newSquad.GetComponent<SquadScript>();
                                 else
                                     playerScripts[1].kingSquadScript = newSquad.GetComponent<SquadScript>();
                             }
 
                             //deselect squad after placing in order to do multi-drop
-                            currentSelectedSquad = null;
+                            DeselectPreviousSquad();
                             bool squadTypeExhausted = hudControlScript.SquadWasPlaced();
 
                             //return to idle state, signal to HUD that placement is complete if remaining troop count for this squad type is zero
@@ -607,7 +644,7 @@ public class GameControl : MonoBehaviour
                 #endregion 
                 break;
 
-            case "ActiveGame":
+            case GamePhase.Active:
                 ConsolePrint("BoardTileClicked - ActiveGame case.");
                 if (currentSelectedSquad == null)
                 {
@@ -725,15 +762,15 @@ public class GameControl : MonoBehaviour
 
         switch (gamePhase)
         {
-            case "PlaceArmyP1":
-            case "PlaceArmyP2":
+            case GamePhase.PlaceArmyP1:
+            case GamePhase.PlaceArmyP2:
                 //find out which way to rotate
                 //tell the associated squad to turn. (no validations around AP remianing in this phase)
                 audioControlScript.RotationArrowClick();
                 arrowControl.associatedSquad.GetComponent<SquadScript>().RotateSquad(rotationDirection);
                 break;
 
-            case "ActiveGame":
+            case GamePhase.Active:
                 int apRequired = currentSelectedSquad.GetComponent<SquadScript>().soldierClassAttributes.apCostToRotate;
                 int apRemaining = playerScripts[activePlayerID].apRemaining;
                 if (apRemaining < apRequired)
@@ -763,9 +800,15 @@ public class GameControl : MonoBehaviour
         DeselectPreviousSquad();
         //called from HUD when the player has hit "PlacementComplete" in the HUD, after placing all squads.
         if (activePlayerID == 0) //first player finished, second player must begin
+        {
+            armyHider.ToggleVisibility();
             BeginArmyPlacement(1);
+        }
         else //all players finished, ready to start game 
+        {
+            armyHider.ToggleVisibility();
             RollForTurnOrder();
+        }
     }//playerArmyPlacementComplete
 
 
@@ -778,25 +821,27 @@ public class GameControl : MonoBehaviour
     {
         activePlayerID = 0;
         //set phase
-        gamePhase = "RollForFirst";
+        gamePhase = GamePhase.RollForFirst;
         //hide the squad placement panel 
         hudControlScript.HideSquadPlacementPanel();
         //set camera to Dice Roll angle mode
         StartCoroutine(AnimateCamera("DiceRoll", true));
         //give the player instructions
-        hudControlScript.PrintMessage("Roll to see who goes first! Player 1, hit SPACE to roll when ready.");
+        hudControlScript.PrintMessage("Roll to see who goes first! " + GameSettings.playerNames[0] + ", hit SPACE to roll when ready.");
         //enable dice rolls
         diceRollIsValid = true;
+        hudControlScript.ToggleDiceRollButtonVisibility();
     }
 
     public void DiceRollBegin()
     {
         //disable additional dice rolls
         diceRollIsValid = false;
+        hudControlScript.ToggleDiceRollButtonVisibility();
 
         //determine how many dice to roll
         int dieCount = 0;
-        if (gamePhase == "RollForFirst")
+        if (gamePhase == GamePhase.RollForFirst)
             dieCount = 4;
         else
             dieCount = combatData.diceAvailable;
@@ -823,7 +868,7 @@ public class GameControl : MonoBehaviour
         yield return new WaitForSeconds(2f);
         switch (gamePhase)
         {
-            case "RollForFirst":
+            case GamePhase.RollForFirst:
                 #region
                 playerScore[activePlayerID] = dieSpawnerScript.diceData.axeCount;
                 switch (activePlayerID)
@@ -832,6 +877,7 @@ public class GameControl : MonoBehaviour
                         hudControlScript.PrintMessage(GameSettings.playerNames[0] + " scored a " + dieSpawnerScript.diceData.axeCount + ". " + GameSettings.playerNames[1] + " Press SPACE to roll.");
                         activePlayerID = 1;
                         diceRollIsValid = true;
+                        hudControlScript.ToggleDiceRollButtonVisibility();
                         break;
                     case 1:
                         if (playerScore[0] > playerScore[1])
@@ -851,16 +897,19 @@ public class GameControl : MonoBehaviour
                             hudControlScript.PrintMessage(GameSettings.playerNames[1] + " scored a " + dieSpawnerScript.diceData.axeCount + ". " + "Tie! " + GameSettings.playerNames[0] + ", roll again.");
                             activePlayerID = 0;
                             diceRollIsValid = true;
+                            hudControlScript.ToggleDiceRollButtonVisibility();
                         }
                         break;
                 }
                 #endregion
                 break;
-            case "Attacking":
+            case GamePhase.Attacking:
+                ConsolePrint("DiceRollEnd called during an Attack.");
                 combatData.EvaluateDamage(dieSpawnerScript.diceData);
                 //report the results
                 StartCoroutine(ResolveAttack());
-                hudControlScript.DismissBanner();
+                if (!combatData.bonusRollEarned)
+                    hudControlScript.DismissBanner();
                 break;
         }//gamephase switch
     }//dice roll end
@@ -882,7 +931,7 @@ public class GameControl : MonoBehaviour
 
         if (Input.GetKeyUp(KeyCode.Space))
         {
-            if ((gamePhase == "RollForFirst" || gamePhase == "Attacking") && diceRollIsValid)
+            if ((gamePhase == GamePhase.RollForFirst || gamePhase == GamePhase.Attacking) && diceRollIsValid)
             {
                 DiceRollBegin();
             }//valid to roll 
@@ -941,14 +990,19 @@ public class GameControl : MonoBehaviour
                 p2Units.Add(thisUnit);
         }
 
+
+        //in quickstart mode, this code fires before GameSettings.Awake(), so some features need to be manually initialized.
+        if (GameSettings.armyRaces == null)
+            GameSettings.DefineArmies();
+
         //loop over each list and apply the team color to all child scripts of type 
         foreach (UnitScript thisUnit in p1Units)
         {
-            thisUnit.SetColor(GameSettings.playerColors[0]);
+            thisUnit.SetColor(GameSettings.armyRaces[GameSettings.playerRaces[0]].armyColor);
         }
         foreach (UnitScript thisUnit in p2Units)
         {
-            thisUnit.SetColor(GameSettings.playerColors[1]);
+            thisUnit.SetColor(GameSettings.armyRaces[GameSettings.playerRaces[1]].armyColor);
         }
     }
 
@@ -977,6 +1031,8 @@ public class GameControl : MonoBehaviour
             Destroy(thisUnit, 0.5f);
         ResetAllTileFlags();
     }
+
+
 
     /***************
      * DEBUG STUFF *
@@ -1045,80 +1101,3 @@ public class GameControl : MonoBehaviour
     }
 
 }//class
-
-/// <summary>
-/// A struct which is designed to track and manage combat data, based on a named attacker, defender, and dice roll dataset
-/// </summary>
-public struct CombatData
-{
-    public GameObject attackerSquad;
-    public GameObject defenderSquad;
-    public SquadScript attackerSquadScript;
-    public SquadScript defenderSquadScript;
-    public bool bonusRollTriggered;
-    public bool bonusRollEligible;
-    public DieType attackType;
-    public Vector3 vectorToAttacker;
-    public int diceAvailable;
-    public int damageDealt;
-    public string panicResult;  //None, AttackerPanics, DefenderPanics
-    public int panicDistance;
-
-
-    /// <summary>
-    /// Constructor for a struct which is designed to track and manage combat data, based on a named attacker, defender, and dice roll dataset
-    /// </summary>
-    /// <param name="newAttackerSquad">The GameObject of the squad which is attacking</param>
-    /// <param name="newDefenderSquad">The GameObject of the squad which is defending</param>
-    public CombatData(GameObject newAttackerSquad, GameObject newDefenderSquad)
-    {
-        attackerSquad = newAttackerSquad;
-        defenderSquad = newDefenderSquad;
-        attackerSquadScript = attackerSquad.GetComponent<SquadScript>();
-        defenderSquadScript = defenderSquad.GetComponent<SquadScript>();
-        bonusRollTriggered = false;
-        //bonus roll is allowed only if the attacker only throws 1 die, and the defender has 2 health
-        bonusRollEligible = attackerSquadScript.GetDiceCount() == 1 && defenderSquadScript.soldierClassAttributes.healthPerUnit == 2;
-        attackType = attackerSquadScript.soldierClassAttributes.attacksWith;
-        vectorToAttacker = (defenderSquad.transform.position - attackerSquad.transform.position) * -1;
-        diceAvailable = attackerSquadScript.GetDiceCount();
-        damageDealt = 0;
-        panicDistance = 0;
-        panicResult = "None";
-    }
-
-    /// <summary>
-    /// Reads data from DieSpawner object after a roll is confirmed complete, in order to evaluate what damage has been done by the attacker
-    /// </summary>
-    /// <param name="diceData">An object of type DiceData, an attribute of the DieSpawner class.</param>
-    /// <returns></returns>
-    public void EvaluateDamage(DiceData diceData)
-    {
-        //log damage results
-        if (attackType == DieType.Axe)
-            damageDealt = diceData.axeCount;
-        else if (attackType == DieType.Arrow)
-            damageDealt = diceData.arrowCount;
-        else //"Any" attacks with whatever die type you roll the most of (Applies to peasants)
-            damageDealt = Mathf.Max(diceData.axeCount, diceData.arrowCount);
-
-        //log panic results
-        PanicDieAction attackerPanicBehaviour = attackerSquadScript.soldierClassAttributes.panicDieAction;
-        if (diceData.panicCount == diceAvailable && attackerPanicBehaviour == PanicDieAction.Standard)
-        {
-            panicResult = "AttackerPanics";
-            panicDistance = 1;
-        }
-        else if (diceData.panicCount > 0 && attackerPanicBehaviour == PanicDieAction.AlwaysPanic)
-        {
-            panicResult = "AttackerPanics";
-            panicDistance = diceData.panicCount;
-        }
-        else if (diceData.panicCount > 0 && attackerPanicBehaviour == PanicDieAction.PanicTargets)
-        {
-            panicResult = "DefenderPanics";
-            panicDistance = diceData.panicCount;
-        }
-    }//EvaluateDamage method
-
-}//CombatData struct

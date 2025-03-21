@@ -21,11 +21,6 @@ public class AudioControl : MonoBehaviour
         musicSource.volume = GameSettings.bgmVolume;
     }
 
-    // Update is called once per frame
-    void Update()
-    {
-    }
-
     public void StartMusic(string track)
     {
         //TODO: Add more clips as needed based on number of BGM themes needed 

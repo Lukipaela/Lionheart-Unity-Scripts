@@ -5,11 +5,15 @@ using UnityEngine.UI;
 
 public class HUDControlScript : MonoBehaviour
 {
+    //variables for public access
+    public SoldierClass selectedSquadType;
+    public int selectedSquadSize;
+
     //inspector linkages
     [SerializeField] private GameObject squadPlacementPanel;
-    [SerializeField] private GameObject messagePanel;
     [SerializeField] private GameObject turnDataPanel;
     [SerializeField] private GameObject quickMenuPanel;
+    [SerializeField] private GameObject settingsPanel;
     [SerializeField] private GameObject kingWidget;
     [SerializeField] private GameObject knightWidget;
     [SerializeField] private GameObject infantryWidget;
@@ -18,43 +22,28 @@ public class HUDControlScript : MonoBehaviour
     [SerializeField] private GameObject heavyInfantryWidget;
     [SerializeField] private GameObject peasantWidget;
     [SerializeField] private GameObject placementCompleteWidget;
-    [SerializeField] private RectTransform messageBannerLocationVisible;
-    [SerializeField] private RectTransform messageBannerLocationHidden;
     [SerializeField] private AudioControl audioControlScript;
     [SerializeField] private InfoPanelScript infoPanelScript;
     [SerializeField] private GameControl gameControlScript;
-    [SerializeField] private GameObject newMessageText;
     [SerializeField] private Sprite[] volumeImages;
-
-    //variables for public access
-    public SoldierClass selectedSquadType;
-    public int selectedSquadSize;
+    [SerializeField] private GameObject diceRollButton;
 
     //PRIVATE DATA
-    private int kingCountMax;
     private int kingCountRemaining;
-    private int knightCountMax;
     private int knightCountRemaining;
-    private int infantryCountMax;
     private int infantryCountRemaining;
-    private int archerCountMax;
     private int archerCountRemaining;
-    private int mercenaryCountMax;
     private int mercenaryCountRemaining;
-    private int heavyInfantryCountMax;
     private int heavyInfantryCountRemaining;
-    private int peasantCountMax;
     private int peasantCountRemaining;
     private int squadsRemaining;   //initialize to 10, the max value allowed in all game modes
+    private TMPro.TextMeshProUGUI messageBannerText;
 
     //banner animation controls
-    private RectTransform messageBannerRectTransform;
-    private bool messageBannerAnimating = true;
-    private string messageBannerAnimationState = "Ascending";//Ascending, Descending
-    private readonly float bannerEntrySpeed = 500;
-    private readonly float bannerExitSpeed = 200;
     private float bannerAscendTimestamp;
     private readonly float messageDuration = 8f;
+    private PanelHider messageBannerHider;
+    private PanelHider placementPanelHider;
 
     //debug
     private readonly bool enableDebugging = false;
@@ -67,36 +56,30 @@ public class HUDControlScript : MonoBehaviour
 
     void Start()
     {
-        messageBannerRectTransform = messagePanel.GetComponent<RectTransform>();
+        RectTransform messageBannerCollection = GameObject.Find("MessagePanelCollection").GetComponent<RectTransform>();
+        messageBannerHider = new PanelHider(messageBannerCollection.Find("ActiveLocation").position, messageBannerCollection.Find("HiddenLocation").position, messageBannerCollection.Find("MessagePanel").GetComponent<RectTransform>(), 500);
+        messageBannerText = messageBannerCollection.Find("MessagePanel").transform.Find("NewMessage").GetComponent<TMPro.TextMeshProUGUI>();
+
+        RectTransform placementPanelCollection = GameObject.Find("PlacementPanelCollection").GetComponent<RectTransform>();
+        placementPanelHider = new PanelHider(placementPanelCollection.Find("ActiveLocation").position, placementPanelCollection.Find("HiddenLocation").position, placementPanelCollection.Find("ArmyPlacementPanel").GetComponent<RectTransform>(), 500);
     }
 
     void Update()
     {
-        if (messageBannerAnimating)
+        placementPanelHider.ManualUpdate();
+        //perform any pending message banner animations
+        messageBannerHider.ManualUpdate();
+        if (bannerAscendTimestamp != -1)
         {
-            switch (messageBannerAnimationState)
+            ConsolePrint("Managing banner timer with " + bannerAscendTimestamp + " seconds remaining");
+            bannerAscendTimestamp -= Time.deltaTime;
+            if (bannerAscendTimestamp < 0)
             {
-                case "Descending":
-                    //move banner toward the 'visible' location
-                    messageBannerRectTransform.position = Vector3.MoveTowards(messageBannerRectTransform.position, messageBannerLocationVisible.position, bannerEntrySpeed * Time.deltaTime);
-                    if (messageBannerRectTransform.position == messageBannerLocationVisible.position)
-                        messageBannerAnimationState = "Holding";
-                    break;
-
-                case "Holding":
-                    bannerAscendTimestamp -= Time.deltaTime;
-                    if (bannerAscendTimestamp < 0)
-                        messageBannerAnimationState = "Ascending";
-                    break;
-
-                case "Ascending":
-                    //move banner toward the 'hidden' location
-                    messageBannerRectTransform.position = Vector3.MoveTowards(messageBannerRectTransform.position, messageBannerLocationHidden.position, bannerExitSpeed * Time.deltaTime);
-                    if (messageBannerRectTransform.position == messageBannerLocationHidden.position)
-                        messageBannerAnimating = false;
-                    break;
-            }//animation state switch
-        } //banner animating
+                ConsolePrint("Hiding banner after timer expiration");
+                messageBannerHider.AssignState(HiderAnimationState.Hiding);
+                bannerAscendTimestamp = -1;
+            }
+        }
     } //Update
 
 
@@ -108,75 +91,45 @@ public class HUDControlScript : MonoBehaviour
     public void InitializeSquadPlacementUI(int playerID)
     {
         //enable/show the panel for squad placement. 
-        squadPlacementPanel.SetActive(true);
+        placementPanelHider.AssignState(HiderAnimationState.Activating);
 
         //set playername on screen
         squadPlacementPanel.transform.GetChild(0).GetComponent<TMPro.TextMeshProUGUI>().text = GameSettings.playerNames[playerID];
 
         //enable/disable widgets on the panel, set squad counts based on game mode 
-        switch (GameSettings.gameMode)
-        {
-            case "Standard":
-                kingCountMax = 1;
-                knightCountMax = 2;
-                infantryCountMax = 5;
-                archerCountMax = 2;
-                mercenaryCountMax = 0;
-                heavyInfantryCountMax = 0;
-                peasantCountMax = 0;
-                break;
-            case "Special":
-                kingCountMax = 1;
-                knightCountMax = 2;
-                infantryCountMax = 2;
-                archerCountMax = 2;
-                mercenaryCountMax = 1;
-                heavyInfantryCountMax = 1;
-                peasantCountMax = 1;
-                break;
-            case "MassiveArmy":
-                kingCountMax = 1;
-                knightCountMax = 2;
-                infantryCountMax = 2;
-                archerCountMax = 1;
-                mercenaryCountMax = 1;
-                heavyInfantryCountMax = 1;
-                peasantCountMax = 1;
-                break;
-        }
-
         //set up the placement complete widget 
-        squadsRemaining = kingCountMax + knightCountMax + infantryCountMax + archerCountMax + mercenaryCountMax + heavyInfantryCountMax + peasantCountMax;
+        squadsRemaining = GameSettings.gameModeAttributes.totalUnits;
         UpdateSquadCountUI();
         placementCompleteWidget.transform.GetChild(1).GetComponent<Button>().interactable = false;
 
+        //initialize counts
+        kingCountRemaining = GameSettings.gameModeAttributes.kingCount;
+        knightCountRemaining = GameSettings.gameModeAttributes.knightCount;
+        infantryCountRemaining = GameSettings.gameModeAttributes.infantryCount;
+        archerCountRemaining = GameSettings.gameModeAttributes.archerCount;
+        mercenaryCountRemaining = GameSettings.gameModeAttributes.mercenaryCount;
+        heavyInfantryCountRemaining = GameSettings.gameModeAttributes.heavyInfantryCount;
+        peasantCountRemaining = GameSettings.gameModeAttributes.peasantCount;
+
         //set counts for default squad types
-        kingWidget.transform.GetChild(0).transform.GetChild(0).GetComponent<TMPro.TextMeshProUGUI>().text = "Kings: " + kingCountMax;
-        knightWidget.transform.GetChild(0).transform.GetChild(0).GetComponent<TMPro.TextMeshProUGUI>().text = "Knights: " + knightCountMax;
-        infantryWidget.transform.GetChild(0).transform.GetChild(0).GetComponent<TMPro.TextMeshProUGUI>().text = "Infantry: " + infantryCountMax;
-        archerWidget.transform.GetChild(0).transform.GetChild(0).GetComponent<TMPro.TextMeshProUGUI>().text = "Archers: " + archerCountMax;
+        kingWidget.transform.GetChild(0).transform.GetChild(0).GetComponent<TMPro.TextMeshProUGUI>().text = "Kings: " + kingCountRemaining;
+        knightWidget.transform.GetChild(0).transform.GetChild(0).GetComponent<TMPro.TextMeshProUGUI>().text = "Knights: " + knightCountRemaining;
+        infantryWidget.transform.GetChild(0).transform.GetChild(0).GetComponent<TMPro.TextMeshProUGUI>().text = "Infantry: " + infantryCountRemaining;
+        archerWidget.transform.GetChild(0).transform.GetChild(0).GetComponent<TMPro.TextMeshProUGUI>().text = "Archers: " + archerCountRemaining;
 
         //potentially disable the special squad types
-        mercenaryWidget.transform.GetChild(0).transform.GetChild(0).GetComponent<TMPro.TextMeshProUGUI>().text = "Mercs: " + mercenaryCountMax;
-        if (mercenaryCountMax == 0)
+        mercenaryWidget.transform.GetChild(0).transform.GetChild(0).GetComponent<TMPro.TextMeshProUGUI>().text = "Mercs: " + mercenaryCountRemaining;
+        if (mercenaryCountRemaining == 0)
             mercenaryWidget.transform.GetChild(0).GetComponent<Button>().interactable = false;
 
-        heavyInfantryWidget.transform.GetChild(0).transform.GetChild(0).GetComponent<TMPro.TextMeshProUGUI>().text = "Heavy Inf: " + heavyInfantryCountMax;
-        if (heavyInfantryCountMax == 0)
+        heavyInfantryWidget.transform.GetChild(0).transform.GetChild(0).GetComponent<TMPro.TextMeshProUGUI>().text = "Heavy Inf: " + heavyInfantryCountRemaining;
+        if (heavyInfantryCountRemaining == 0)
             heavyInfantryWidget.transform.GetChild(0).GetComponent<Button>().interactable = false;
 
-        peasantWidget.transform.GetChild(0).transform.GetChild(0).GetComponent<TMPro.TextMeshProUGUI>().text = "Peasants: " + peasantCountMax;
-        if (peasantCountMax == 0)
+        peasantWidget.transform.GetChild(0).transform.GetChild(0).GetComponent<TMPro.TextMeshProUGUI>().text = "Peasants: " + peasantCountRemaining;
+        if (peasantCountRemaining == 0)
             peasantWidget.transform.GetChild(0).GetComponent<Button>().interactable = false;
 
-        //initialize counts
-        kingCountRemaining = kingCountMax;
-        knightCountRemaining = knightCountMax;
-        infantryCountRemaining = infantryCountMax;
-        archerCountRemaining = archerCountMax;
-        mercenaryCountRemaining = mercenaryCountMax;
-        heavyInfantryCountRemaining = heavyInfantryCountMax;
-        peasantCountRemaining = peasantCountMax;
 
         //reinitialize button security
         EnableButtons();
@@ -225,7 +178,7 @@ public class HUDControlScript : MonoBehaviour
     private void AddSquadButtonPressed()
     {
         //generic actions that happen when any Add Squad button was pressed 
-        audioControlScript.GeneralButtonClick();
+        ClickSound();
         DisableButtons();
     }
 
@@ -328,9 +281,8 @@ public class HUDControlScript : MonoBehaviour
     public void PrintMessage(string message)
     {
         ConsolePrint("Print message received:  " + message);
-        newMessageText.GetComponent<TMPro.TextMeshProUGUI>().text = message;
-        messageBannerAnimating = true;
-        messageBannerAnimationState = "Descending";
+        messageBannerText.text = message;
+        messageBannerHider.AssignState(HiderAnimationState.Activating);
         //reset timer
         bannerAscendTimestamp = messageDuration;
     }//print message
@@ -352,15 +304,23 @@ public class HUDControlScript : MonoBehaviour
 
     public void DismissBanner()
     {
-        messageBannerAnimationState = "Ascending";
+        messageBannerHider.AssignState(HiderAnimationState.Hiding);
     }
 
     public void HideSquadPlacementPanel()
     {
-        squadPlacementPanel.SetActive(false);
+        placementPanelHider.AssignState(HiderAnimationState.Hiding);
     }
 
+    public void ToggleDiceRollButtonVisibility()
+    {
+        diceRollButton.SetActive(!diceRollButton.activeSelf);
+    }
 
+    public void SetInfoPanelVisibility(bool makeVisible)
+    {
+        infoPanelScript.gameObject.SetActive(makeVisible);
+    }
 
     /******************
      * BUTTON METHODS *
@@ -424,6 +384,7 @@ public class HUDControlScript : MonoBehaviour
 
     public void PlacementCompleteClicked()
     {
+        ClickSound();
         gameControlScript.PlayerArmyPlacementComplete();
     }
 
@@ -431,6 +392,7 @@ public class HUDControlScript : MonoBehaviour
     {
         //All logic here is done by the music control script, as the only current actions are to pause/play the theme song
         ConsolePrint("Mute button click detected.");
+        ClickSound();
         if (audioControlScript.MuteButtonClick())
             quickMenuPanel.transform.GetChild(1).GetComponent<Image>().sprite = volumeImages[1];
         else
@@ -444,11 +406,63 @@ public class HUDControlScript : MonoBehaviour
     public void HelpClicked()
     {
         ConsolePrint("Help button click detected.");
-        audioControlScript.GeneralButtonClick();
-        infoPanelScript.toggleVisibility();
+        ClickSound();
+        infoPanelScript.panelHider.ToggleVisibility();
     }
 
+    /// <summary>
+    /// Called when the user clicks the Settings button (currently a gear icon)
+    /// Presents the same settings window from the home screen via asset re-use
+    /// </summary>
+    public void SettingsClicked()
+    {
+        ConsolePrint("Settings button click detected.");
+        ClickSound();
+        settingsPanel.SetActive(true);
+    }
 
+    /// <summary>
+    /// Called when the Save button is clicked on the settings panel.
+    /// Closes the settings panel to resume play.
+    /// </summary>
+    public void SaveSettingsClicked()
+    {
+        ConsolePrint("Save Settings button click detected.");
+        audioControlScript.GeneralButtonClick();
+        settingsPanel.SetActive(false);
+    }
+
+    /// <summary>
+    /// Handles the UI event of clicking on the dice button.
+    /// </summary>
+    public void DiceRollClicked()
+    {
+        ConsolePrint("DiceRollClickedClicked called.");
+        ClickSound();
+        gameControlScript.DiceRollBegin();
+    }
+
+    /// <summary>
+    /// A pass-through function to invoke the clickm SFGX on the audio controller
+    /// made for use by scripts which are slave to this one. to avoid the need to also link
+    /// those scripts to the audio manager. 
+    /// </summary>
+    public void ClickSound()
+    {
+        ConsolePrint("ClickSound called.");
+        audioControlScript.GeneralButtonClick();
+    }
+
+    /// <summary>
+    /// Called when the clicking Return from the rulebook panel
+    /// closes the rulebok and presents the pause menu again
+    /// </summary>
+    public void CloseRuleBook()
+    {
+        ConsolePrint("CloseRuleBook called.");
+        //TODO: close rulebook, show pause menu again
+
+    }
 
     /***************
      * DEBUG STUFF *

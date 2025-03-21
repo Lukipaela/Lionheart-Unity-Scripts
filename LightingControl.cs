@@ -7,15 +7,16 @@ public class LightingControl : MonoBehaviour
     public Light sun;
 
     [SerializeField] private AudioSource sunAudioSource;
-    [SerializeField] private AudioClip morningStart;
-    [SerializeField] private AudioClip nightStart;
-    [SerializeField] private AudioClip morningAmbient;
-    [SerializeField] private AudioClip nightAmbient;
+    [SerializeField] private SoundFile morningStart;
+    [SerializeField] private SoundFile nightStart;
+    [SerializeField] private SoundFile morningAmbient;
+    [SerializeField] private SoundFile nightAmbient;
     [SerializeField] private float sunRotationSpeed = 4;
     [SerializeField] private float sunAngle = 0;
-    [SerializeField] private string dayPhase = "Day"; // Day or Night
+    [SerializeField] private DayPhase dayPhase = DayPhase.Day; // Day or Night
     [SerializeField] private FlameControl[] flameSources;
-
+    private int dawnAngle = 350;
+    private int duskAngle = 125;
     private readonly bool enableDebugging = false; //switch to enable/disable console logging for this script
 
     /********************
@@ -27,32 +28,60 @@ public class LightingControl : MonoBehaviour
         PlaySound(morningAmbient, true);
     }
 
-
     void Update()
     {
-        float rotationAmount = sunRotationSpeed * Time.deltaTime;
-        sunAngle = (sunAngle + rotationAmount) % 360;
-        sun.transform.Rotate(new Vector3(rotationAmount, 0, 0));
-        //Set Day Phase
-        if (dayPhase == "Day" && sunAngle > 125 && sunAngle < 135)
-            ChangeDayPhase("Night");
-        else if (dayPhase == "Night" && (sunAngle > 350 || sunAngle < 0))
-            ChangeDayPhase("Day");
+        if (GameSettings.timeCycleMode == TimeCycleMode.Cycle)
+        {
+            float rotationAmount = sunRotationSpeed * Time.deltaTime;
+            sunAngle = (sunAngle + rotationAmount) % 360;
+            sun.transform.Rotate(new Vector3(rotationAmount, 0, 0));
+            //Set Day Phase
+            if (dayPhase == DayPhase.Day && sunAngle > duskAngle && sunAngle < duskAngle + 20)
+                ChangeDayPhase(DayPhase.Night);
+            else if (dayPhase == DayPhase.Night && (sunAngle > dawnAngle || sunAngle < (dawnAngle + 20) % 360))
+                ChangeDayPhase(DayPhase.Day);
+        }
     }   //Update
 
+    public void SetTimeCycleMode(TimeCycleMode newTimeCycleMode)
+    {
+        float rotationAmount = 1;
+        switch (newTimeCycleMode)
+        {
+            case TimeCycleMode.Day:
+                while (sunAngle < dawnAngle && sunAngle > (dawnAngle + 15) % 360)
+                {
+                    sunAngle = (sunAngle + rotationAmount) % 360;
+                    sun.transform.Rotate(new Vector3(rotationAmount, 0, 0));
+                }
+                ChangeDayPhase(DayPhase.Day);
+                break;
+            case TimeCycleMode.Night:
+                while (sunAngle < duskAngle || sunAngle > duskAngle + 15)
+                {
+                    sunAngle = (sunAngle + rotationAmount) % 360;
+                    sun.transform.Rotate(new Vector3(rotationAmount, 0, 0));
+                }
+                ChangeDayPhase(DayPhase.Night);
+                break;
+            default:
+                // no changes needed for Pause or Cycle
+                break;
+        }
+    }
 
-    private void ChangeDayPhase(string phase)
+    private void ChangeDayPhase(DayPhase phase)
     {
         ConsolePrint("Changing day phase to " + phase);
         dayPhase = phase;
         switch (phase)
         {
-            case "Day":
+            case DayPhase.Day:
                 ToggleFires(false);
                 PlaySound(morningAmbient, true);
                 PlaySound(morningStart, false);
                 break;
-            case "Night":
+            case DayPhase.Night:
                 ToggleFires(true);
                 PlaySound(nightAmbient, true);
                 PlaySound(nightStart, false);
@@ -65,15 +94,16 @@ public class LightingControl : MonoBehaviour
     /// </summary>
     /// <param name="soundToPlay">The Audio Clip to be played.</param>
     /// <param name="loopTrack">Indicates if the sound should loop indefinitely (until explicitly cancelled by some other process).</param>
-    private void PlaySound(AudioClip soundToPlay, bool loopTrack)
+    private void PlaySound(SoundFile soundToPlay, bool loopTrack)
     {
         if (!loopTrack)
-            sunAudioSource.PlayOneShot(soundToPlay);
+            sunAudioSource.PlayOneShot(soundToPlay.audioClip, soundToPlay.volume);
         else
         {
             sunAudioSource.Stop();
             sunAudioSource.loop = loopTrack;
-            sunAudioSource.clip = soundToPlay;
+            sunAudioSource.clip = soundToPlay.audioClip;
+            sunAudioSource.volume = soundToPlay.volume;
             sunAudioSource.Play();
         }
     }
@@ -89,6 +119,7 @@ public class LightingControl : MonoBehaviour
             StartCoroutine(thisFlameControl.ToggleEffects(enableEffects));
         }
     }
+
 
     /***************
      * DEBUG STUFF *

@@ -46,7 +46,10 @@ public class BoardTileScript : MonoBehaviour
 
     public void ClearTile()
     {
-        ConsolePrint("clearing tile: " + gameObject.name + " of previous occupying squad: " + occupyingSquad.gameObject.name);
+        string squadName = "";
+        if (occupyingSquad.gameObject is not null)
+            squadName = occupyingSquad.gameObject.name;
+        ConsolePrint("clearing tile: " + gameObject.name + " of previous occupying squad: " + squadName);
         isOccupied = false;
         occupyingSquad = null;
         ClearAllHighlights();

@@ -20,16 +20,19 @@ public class MouseDetector : MonoBehaviour
      * BUILT-IN METHODS *
      ********************/
 
-    void Start(){
+    void Start()
+    {
         lastRayCastHitObjectName = "none";
     }
 
-    void Update(){
+    void Update()
+    {
         ray = Camera.main.ScreenPointToRay(Input.mousePosition);
         if (Physics.Raycast(ray, out hit))
         {
             //ignore any raycasting that is not over a gameobject (meaning, anything pointed at a UI canvas)
-            if (!EventSystem.current.IsPointerOverGameObject()) { 
+            if (!EventSystem.current.IsPointerOverGameObject())
+            {
 
                 if (hit.collider.name != lastRayCastHitObjectName)
                 {
@@ -57,14 +60,12 @@ public class MouseDetector : MonoBehaviour
                         case "SquadTile":
                             gameControlScript.SquadClicked(hit.collider.gameObject);
                             break;
-                        case "RotationArrow":
-                            gameControlScript.RotationArrowClicked(hit.collider.gameObject);
-                            break;
                     }//switch
                 }//clicked
             }//mouse is not over UI item 
         }//raycast hit (mouse hovering)
-        else{
+        else
+        {
             NonArrowHover();
         }//no raycast hit
 
@@ -75,7 +76,8 @@ public class MouseDetector : MonoBehaviour
      * CUSTOM METHODS *
      ******************/
 
-    private void ArrowHover(){
+    private void ArrowHover()
+    {
         //if this is a different arrow we are hovering over now, turn off the old one first. 
         if (hit.collider.gameObject != highlightedArrow)
             NonArrowHover();
@@ -84,8 +86,10 @@ public class MouseDetector : MonoBehaviour
         rotationArrowControlScript.SetHighlighting(true, highlightedArrow);
     }
 
-    private void NonArrowHover(){
-        if (highlightedArrow != null){
+    private void NonArrowHover()
+    {
+        if (highlightedArrow != null)
+        {
             rotationArrowControlScript.SetHighlighting(false, highlightedArrow);
             highlightedArrow = null;
         }

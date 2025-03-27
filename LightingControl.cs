@@ -11,12 +11,13 @@ public class LightingControl : MonoBehaviour
     [SerializeField] private SoundFile nightStart;
     [SerializeField] private SoundFile morningAmbient;
     [SerializeField] private SoundFile nightAmbient;
-    [SerializeField] private float sunRotationSpeed = 4;
-    [SerializeField] private float sunAngle = 0;
-    [SerializeField] private DayPhase dayPhase = DayPhase.Day; // Day or Night
+    [SerializeField] private float sunRotationSpeed = 4;    //serialized for fine-tuning
+    [SerializeField] private float sunAngle = 0;    //serialized for debugging
+    [SerializeField] private DayPhase dayPhase = DayPhase.Day;
     [SerializeField] private FlameControl[] flameSources;
-    private int dawnAngle = 350;
-    private int duskAngle = 125;
+    private readonly int dawnAngle = 350;
+    private readonly int duskAngle = 125;
+    //debug
     private readonly bool enableDebugging = false; //switch to enable/disable console logging for this script
 
     /********************

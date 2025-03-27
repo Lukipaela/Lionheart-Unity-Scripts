@@ -22,7 +22,7 @@ public class UnitScript : MonoBehaviour
     private bool isDead = false;
 
     //debug
-    private readonly bool enableDebugging = true;
+    private readonly bool enableDebugging = false;
 
 
     /********************

@@ -558,9 +558,9 @@ public class SquadScript : MonoBehaviour
             for (int i = 0; i < Mathf.Abs(netRotation); i++)
             {
                 if (netRotation > 0)
-                    RotateSquad("Right");
+                    RotateSquad(RotationCommand.Right);
                 else
-                    RotateSquad("Left");
+                    RotateSquad(RotationCommand.Left);
             }
             while (IsTheSquadAnimating())
             {
@@ -636,14 +636,16 @@ public class SquadScript : MonoBehaviour
         animationQueue.Add(new AnimationTask("MoveSquad", occupiedGameTile.transform.position));
     }//move Location
 
-    public void RotateSquad(string direction)
+    public void RotateSquad(RotationCommand rotationCommand)
     {
-        ConsolePrint("Rotation orders received: " + direction);
+        ConsolePrint("Rotation orders received: " + rotationCommand);
 
-        if (direction == "Left")
+        if (rotationCommand == RotationCommand.Left)
             orientationIndex = (orientationIndex - 1 + 4) % 4;
-        if (direction == "Right")
+        if (rotationCommand == RotationCommand.Right)
             orientationIndex = (orientationIndex + 1) % 4;
+        if (rotationCommand == RotationCommand.Reverse)
+            orientationIndex = (orientationIndex + 2) % 4;
 
         //determine target vector
         Vector3 rotationTargetVector = GameSettings.orientations[orientationIndex];

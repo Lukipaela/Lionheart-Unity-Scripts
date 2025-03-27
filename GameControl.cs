@@ -13,11 +13,11 @@ public class GameControl : MonoBehaviour
     public int activePlayerID = 0;
     public PlayerScript[] playerScripts;
 
-    //PRIVATE VARS (Serialized fields are accessible within the editor, but aren't exposed to other scripts as a facet of this class
+    //PRIVATE VARS (Serialized fields are accessible within the editor, but aren't exposed to other scripts as a facet of this class)
     [SerializeField] private GameObject[] ReferenceCenterTiles;
     [SerializeField] private LightingControl lightControlScript;
     [SerializeField] private AudioControl audioControlScript;
-    [SerializeField] private RotationArrowControl rotationArrowControlScript;
+    //[SerializeField] private RotationArrowControl rotationArrowControlScript;
     [SerializeField] private HUDControlScript hudControlScript;
     [SerializeField] private GameOverPanelScript gameOverPanelScript;
     [SerializeField] private InfoPanelScript infoPanelScript;
@@ -35,7 +35,7 @@ public class GameControl : MonoBehaviour
     private CombatData combatData;
     private ObjectHider armyHider;
     //debug
-    private readonly bool enableDebugging = true; //switch to enable/disable console logging for this script
+    private readonly bool enableDebugging = false; //switch to enable/disable console logging for this script
 
 
 
@@ -66,6 +66,9 @@ public class GameControl : MonoBehaviour
 
         //initialize the time of day
         lightControlScript.SetTimeCycleMode(GameSettings.timeCycleMode);
+
+        //initialize hud buttons
+        hudControlScript.SetRotationButtonVisibility(false);
     }//start
 
     private void Update()
@@ -99,7 +102,6 @@ public class GameControl : MonoBehaviour
         if (currentSelectedSquad != null)
             currentSelectedSquad.GetComponent<SquadScript>().SetSelected(false);
         currentSelectedSquad = null;
-        rotationArrowControlScript.HideArrows();
     }//DeselectPreviousSquad
 
     public void DefineSquadToPlaceFromUI(string prefabAddress)
@@ -289,11 +291,6 @@ public class GameControl : MonoBehaviour
 
         switch (gamePhase)
         {
-            case GamePhase.PlaceArmyP1:
-            case GamePhase.PlaceArmyP2:
-                //the only animation in army placement is the squad relocation mechanic. 
-                rotationArrowControlScript.AssignToSquad(currentSelectedSquad);
-                break;
             case GamePhase.Active:
             case GamePhase.Attacking:
             case GamePhase.QuickStart:
@@ -316,10 +313,9 @@ public class GameControl : MonoBehaviour
                 }
                 else if (currentSelectedSquad != null)
                 {
-                    //reapply the arrows if a squad is still selected, and the turn is not over.
-                    rotationArrowControlScript.AssignToSquad(currentSelectedSquad);
                     currentSelectedSquad.GetComponent<SquadScript>().EnableActionHighlights();
                     currentSelectedSquad.GetComponent<SquadScript>().SetSelected(true);
+                    hudControlScript.SetRotationButtonVisibility(true);
                 }
                 gamePhase = GamePhase.Active;
                 break;
@@ -341,6 +337,7 @@ public class GameControl : MonoBehaviour
         playerScripts[activePlayerID].BeginTurn();
         //setup hud panel
         hudControlScript.SetTurnData(activePlayerID, playerScripts[activePlayerID].apRemaining);
+        hudControlScript.SetRotationButtonVisibility(false);
     }//End Turn
 
     public void GameOver()
@@ -393,7 +390,7 @@ public class GameControl : MonoBehaviour
         if (elimenatedSquad == currentSelectedSquad)
         {
             currentSelectedSquad = null;
-            rotationArrowControlScript.HideArrows();
+            hudControlScript.SetRotationButtonVisibility(false);
         }
         //destroy the squad object 
         Destroy(elimenatedSquad, GameSettings.deathLingerDuration);
@@ -573,12 +570,14 @@ public class GameControl : MonoBehaviour
                     {
                         //if we are altering placement, but we pick a new squad, toggle to that squad instead.
                         if (currentSelectedSquad != null)
+                        {
                             DeselectPreviousSquad();
+                            hudControlScript.SetRotationButtonVisibility(true);
+                        }
                         if (currentSelectedSquad != selectedTileControlScript.occupyingSquad)
                         {
                             currentSelectedSquad = selectedTileControlScript.occupyingSquad;
                             currentSelectedSquad.GetComponent<SquadScript>().SetSelected(true);
-                            rotationArrowControlScript.AssignToSquad(currentSelectedSquad);
                         }
                         else
                         {
@@ -597,7 +596,6 @@ public class GameControl : MonoBehaviour
                             else
                             {
                                 MoveSquadPosition(currentSelectedSquad, selectedBoardTile);
-                                rotationArrowControlScript.HideArrows();
                             }
                         }
                     }//empty tile clicked
@@ -614,7 +612,7 @@ public class GameControl : MonoBehaviour
                         else
                         {
                             audioControlScript.GeneralButtonClick();
-                            ConsolePrint("Instantiation object with address: " + squadToPlacePrefabAddress);
+                            ConsolePrint("Instantiating object with address: " + squadToPlacePrefabAddress);
                             //create, place, define the squad
                             GameObject newSquad = CreateAndPlaceSquad(selectedBoardTile, activePlayerID, hudControlScript.selectedSquadType, hudControlScript.selectedSquadSize, squadToPlacePrefabAddress);
                             if (hudControlScript.selectedSquadType == SoldierClass.King)
@@ -668,7 +666,7 @@ public class GameControl : MonoBehaviour
                             currentSelectedSquad = clickedSquad;
                             infoPanelScript.SetData(currentSelectedSquad.GetComponent<SquadScript>().soldierClassAttributes);
                             currentSelectedSquad.GetComponent<SquadScript>().SetSelected(true);
-                            rotationArrowControlScript.AssignToSquad(currentSelectedSquad);
+                            hudControlScript.SetRotationButtonVisibility(true);
                         }//player has clicked on one of their own squad tiles
                     }//tile was occupied
                 }//no squad currently selected
@@ -693,7 +691,6 @@ public class GameControl : MonoBehaviour
                                 //decrease the player's AP
                                 actionTaken = true;
                                 audioControlScript.GeneralButtonClick();
-                                rotationArrowControlScript.HideArrows();
                                 playerScripts[activePlayerID].ConsumeAP(apRequired);
                                 ResetAllTileFlags();
                                 MoveSquadPosition(currentSelectedSquad, selectedBoardTile);
@@ -729,7 +726,7 @@ public class GameControl : MonoBehaviour
                                 {  //begin attack mechanic
                                     actionTaken = true;
                                     audioControlScript.GeneralButtonClick();
-                                    rotationArrowControlScript.HideArrows();
+                                    hudControlScript.SetRotationButtonVisibility(false);
                                     //decrease the player's AP
                                     playerScripts[activePlayerID].ConsumeAP(apRequired);
                                     //attack
@@ -746,7 +743,6 @@ public class GameControl : MonoBehaviour
                             currentSelectedSquad = clickedSquad;
                             infoPanelScript.SetData(currentSelectedSquad.GetComponent<SquadScript>().soldierClassAttributes);
                             currentSelectedSquad.GetComponent<SquadScript>().SetSelected(true);
-                            rotationArrowControlScript.AssignToSquad(currentSelectedSquad);
                         }//player has clicked on one of their own squad tiles
                     }//tile was occupied
                 }//player had already selected a squad to issue orders to 
@@ -754,11 +750,17 @@ public class GameControl : MonoBehaviour
         }//phase switch 
     }//board tile clicked
 
-    public void RotationArrowClicked(GameObject arrow)
+    public void RotationArrowClicked(string rotationCommand_str)
     {
         ConsolePrint("Rotation arrow clicked.");
-        RotationArrowControl arrowControl = arrow.transform.parent.GetComponent<RotationArrowControl>();
-        string rotationDirection = arrowControl.GetDirection(arrow);
+        //Button click events are unable to pass enums as parameters, so convert the input string to the enum type immediately
+        RotationCommand rotationCommand;
+        if (rotationCommand_str == "Left")
+            rotationCommand = RotationCommand.Left;
+        else if (rotationCommand_str == "Right")
+            rotationCommand = RotationCommand.Right;
+        else
+            rotationCommand = RotationCommand.Reverse;
 
         switch (gamePhase)
         {
@@ -767,7 +769,7 @@ public class GameControl : MonoBehaviour
                 //find out which way to rotate
                 //tell the associated squad to turn. (no validations around AP remianing in this phase)
                 audioControlScript.RotationArrowClick();
-                arrowControl.associatedSquad.GetComponent<SquadScript>().RotateSquad(rotationDirection);
+                currentSelectedSquad.GetComponent<SquadScript>().RotateSquad(rotationCommand);
                 break;
 
             case GamePhase.Active:
@@ -782,13 +784,12 @@ public class GameControl : MonoBehaviour
                 {
                     actionTaken = true;
                     audioControlScript.RotationArrowClick();
-                    SquadScript currentSelectedSquadScript = arrowControl.associatedSquad.GetComponent<SquadScript>();
                     //decrease the player's AP
                     playerScripts[activePlayerID].ConsumeAP(apRequired);
                     //tell the associated squad to turn. (no validations around AP remianing in this phase)
-                    currentSelectedSquadScript.RotateSquad(rotationDirection);
+                    currentSelectedSquad.GetComponent<SquadScript>().RotateSquad(rotationCommand);
                     ResetAllTileFlags();
-                    rotationArrowControlScript.HideArrows();
+                    hudControlScript.SetRotationButtonVisibility(false);
                 }//valid action
                 break;
         }//game phase switch
@@ -938,8 +939,12 @@ public class GameControl : MonoBehaviour
         }//space pressed
 
 
-        //TODO: Disable the next line for real gameplay
-        CheckDebugCommands();
+        if (Input.GetKeyUp(KeyCode.Escape))
+        {
+            hudControlScript.PauseClicked();
+        }//escape pressed
+
+        //CheckDebugCommands();
 
     }//CheckKeyboardCommands
 
@@ -1021,7 +1026,7 @@ public class GameControl : MonoBehaviour
     }
 
     /// <summary>
-    /// Called by the Reset. Will locate all squad scripts and command them to die, then destroy them, and release their tile.
+    /// Called by the Reset mechanic. Will locate all squad scripts and command them to die, then destroy them, and release their tile.
     /// </summary>
     private void ClearAllUnits()
     {

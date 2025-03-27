@@ -23,7 +23,6 @@ public class AudioControl : MonoBehaviour
 
     public void StartMusic(string track)
     {
-        //TODO: Add more clips as needed based on number of BGM themes needed 
         // setup, active game, victory? 
         switch (track)
         {

@@ -1,7 +1,9 @@
 using System.Collections;
 using System.Collections.Generic;
+using UnityEngine.SceneManagement;
 using UnityEngine;
 using UnityEngine.UI;
+using Unity.VisualScripting;
 
 public class HUDControlScript : MonoBehaviour
 {
@@ -14,6 +16,9 @@ public class HUDControlScript : MonoBehaviour
     [SerializeField] private GameObject turnDataPanel;
     [SerializeField] private GameObject quickMenuPanel;
     [SerializeField] private GameObject settingsPanel;
+    [SerializeField] private GameObject rotationArrowPanel;
+    [SerializeField] private GameObject rulebookPanel;
+    [SerializeField] private GameObject pausePanel;
     [SerializeField] private GameObject kingWidget;
     [SerializeField] private GameObject knightWidget;
     [SerializeField] private GameObject infantryWidget;
@@ -24,6 +29,7 @@ public class HUDControlScript : MonoBehaviour
     [SerializeField] private GameObject placementCompleteWidget;
     [SerializeField] private AudioControl audioControlScript;
     [SerializeField] private InfoPanelScript infoPanelScript;
+    [SerializeField] private LightingControl lightingControlScript;
     [SerializeField] private GameControl gameControlScript;
     [SerializeField] private Sprite[] volumeImages;
     [SerializeField] private GameObject diceRollButton;
@@ -36,7 +42,7 @@ public class HUDControlScript : MonoBehaviour
     private int mercenaryCountRemaining;
     private int heavyInfantryCountRemaining;
     private int peasantCountRemaining;
-    private int squadsRemaining;   //initialize to 10, the max value allowed in all game modes
+    private int squadsRemaining;
     private TMPro.TextMeshProUGUI messageBannerText;
 
     //banner animation controls
@@ -215,57 +221,99 @@ public class HUDControlScript : MonoBehaviour
                 kingCountRemaining--;
                 kingWidget.transform.GetChild(0).transform.GetChild(0).GetComponent<TMPro.TextMeshProUGUI>().text = "Kings: " + kingCountRemaining;
                 if (kingCountRemaining == 0)
+                {
+                    PrintMessage("All " + selectedSquadType + " units placed. Select a new squad type, or click placed units to rearrange their positions.");
                     squadTypeExhausted = true;
+                }
                 else
+                {
+                    PrintMessage("Place " + kingCountRemaining + " additional " + selectedSquadType + " unit(s).");
                     squadTypeExhausted = false;
+                }
                 break;
             case SoldierClass.Archer:
                 archerCountRemaining--;
                 archerWidget.transform.GetChild(0).transform.GetChild(0).GetComponent<TMPro.TextMeshProUGUI>().text = "Archers: " + archerCountRemaining;
                 if (archerCountRemaining == 0)
+                {
+                    PrintMessage("All " + selectedSquadType + " units placed. Select a new squad type, or click placed units to rearrange their positions.");
                     squadTypeExhausted = true;
+                }
                 else
+                {
+                    PrintMessage("Place " + archerCountRemaining + " additional " + selectedSquadType + " unit(s).");
                     squadTypeExhausted = false;
+                }
                 break;
             case SoldierClass.Knight:
                 knightCountRemaining--;
                 knightWidget.transform.GetChild(0).transform.GetChild(0).GetComponent<TMPro.TextMeshProUGUI>().text = "Knights: " + knightCountRemaining;
                 if (knightCountRemaining == 0)
+                {
+                    PrintMessage("All " + selectedSquadType + " units placed. Select a new squad type, or click placed units to rearrange their positions.");
                     squadTypeExhausted = true;
+                }
                 else
+                {
+                    PrintMessage("Place " + knightCountRemaining + " additional " + selectedSquadType + " unit(s).");
                     squadTypeExhausted = false;
+                }
                 break;
             case SoldierClass.Infantry:
                 infantryCountRemaining--;
                 infantryWidget.transform.GetChild(0).transform.GetChild(0).GetComponent<TMPro.TextMeshProUGUI>().text = "Infantry: " + infantryCountRemaining;
                 if (infantryCountRemaining == 0)
+                {
+                    PrintMessage("All " + selectedSquadType + " units placed. Select a new squad type, or click placed units to rearrange their positions.");
                     squadTypeExhausted = true;
+                }
                 else
+                {
+                    PrintMessage("Place " + infantryCountRemaining + " additional " + selectedSquadType + " unit(s).");
                     squadTypeExhausted = false;
+                }
                 break;
             case SoldierClass.HeavyInfantry:
                 heavyInfantryCountRemaining--;
                 heavyInfantryWidget.transform.GetChild(0).transform.GetChild(0).GetComponent<TMPro.TextMeshProUGUI>().text = "Heavy Inf: " + heavyInfantryCountRemaining;
                 if (heavyInfantryCountRemaining == 0)
+                {
+                    PrintMessage("All " + selectedSquadType + " units placed. Select a new squad type, or click placed units to rearrange their positions.");
                     squadTypeExhausted = true;
+                }
                 else
+                {
+                    PrintMessage("Place " + heavyInfantryCountRemaining + " additional " + selectedSquadType + " unit(s).");
                     squadTypeExhausted = false;
+                }
                 break;
             case SoldierClass.Mercenary:
                 mercenaryCountRemaining--;
                 mercenaryWidget.transform.GetChild(0).transform.GetChild(0).GetComponent<TMPro.TextMeshProUGUI>().text = "Mercs: " + mercenaryCountRemaining;
                 if (mercenaryCountRemaining == 0)
+                {
+                    PrintMessage("All " + selectedSquadType + " units placed. Select a new squad type, or click placed units to rearrange their positions.");
                     squadTypeExhausted = true;
+                }
                 else
+                {
+                    PrintMessage("Place " + mercenaryCountRemaining + " additional " + selectedSquadType + " unit(s).");
                     squadTypeExhausted = false;
+                }
                 break;
             case SoldierClass.Peasant:
                 peasantCountRemaining--;
                 peasantWidget.transform.GetChild(0).transform.GetChild(0).GetComponent<TMPro.TextMeshProUGUI>().text = "Peasants: " + peasantCountRemaining;
                 if (peasantCountRemaining == 0)
+                {
+                    PrintMessage("All " + selectedSquadType + " units placed. Select a new squad type, or click placed units to rearrange their positions.");
                     squadTypeExhausted = true;
+                }
                 else
+                {
+                    PrintMessage("Place " + peasantCountRemaining + " additional " + selectedSquadType + " unit(s).");
                     squadTypeExhausted = false;
+                }
                 break;
         }
 
@@ -320,6 +368,11 @@ public class HUDControlScript : MonoBehaviour
     public void SetInfoPanelVisibility(bool makeVisible)
     {
         infoPanelScript.gameObject.SetActive(makeVisible);
+    }
+
+    public void SetRotationButtonVisibility(bool enable)
+    {
+        rotationArrowPanel.SetActive(enable);
     }
 
     /******************
@@ -386,6 +439,7 @@ public class HUDControlScript : MonoBehaviour
     {
         ClickSound();
         gameControlScript.PlayerArmyPlacementComplete();
+        DismissBanner();
     }
 
     public void MuteClicked()
@@ -430,6 +484,8 @@ public class HUDControlScript : MonoBehaviour
         ConsolePrint("Save Settings button click detected.");
         audioControlScript.GeneralButtonClick();
         settingsPanel.SetActive(false);
+        // apply changes to settings
+        lightingControlScript.SetTimeCycleMode(GameSettings.timeCycleMode);
     }
 
     /// <summary>
@@ -460,8 +516,47 @@ public class HUDControlScript : MonoBehaviour
     public void CloseRuleBook()
     {
         ConsolePrint("CloseRuleBook called.");
-        //TODO: close rulebook, show pause menu again
+        rulebookPanel.SetActive(false);
+    }
 
+    /// <summary>
+    /// Opens the rulebook panel from the pause menu
+    /// </summary>
+    public void OpenRuleBook()
+    {
+        ConsolePrint("OpenRuleBook called.");
+        rulebookPanel.SetActive(true);
+        ClickSound();
+    }
+
+    /// <summary>
+    /// Enables the pause menu, allowing access to Settings, Rulebook and Quit
+    /// </summary>
+    public void PauseClicked()
+    {
+        ConsolePrint("Pause button click detected.");
+        ClickSound();
+        pausePanel.SetActive(true);
+    }
+
+    /// <summary>
+    /// Closes the pause menu to resume the game
+    /// </summary>
+    public void ResumeClicked()
+    {
+        ConsolePrint("Resume button click detected.");
+        ClickSound();
+        pausePanel.SetActive(false);
+    }
+
+    /// <summary>
+    /// Quits the active game and moves back to to the main menu scene
+    /// </summary>
+    public void QuitClicked()
+    {
+        ConsolePrint("Quit click detected.");
+        ClickSound();
+        SceneManager.LoadScene("MainMenuScene");
     }
 
     /***************

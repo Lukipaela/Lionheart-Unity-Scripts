@@ -750,6 +750,12 @@ public class GameControl : MonoBehaviour
         }//phase switch 
     }//board tile clicked
 
+    /// <summary>
+    /// Called when a squd rotation button is pressed. 
+    /// Validates if the command can be carried out based on game state/remaining AP. 
+    /// Rotates the squad, if valid.
+    /// Should really be moved to HUDControl, but is here as an artifact from when the rotation was controlled by a 3d object in-game.
+    /// </summary>
     public void RotationArrowClicked(string rotationCommand_str)
     {
         ConsolePrint("Rotation arrow clicked.");

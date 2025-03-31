@@ -15,11 +15,20 @@ public class AudioControl : MonoBehaviour
 
     private bool bgmEnabled = false;
 
-    // Start is called before the first frame update
+
+    /********************
+     * BUILT-IN METHODS *
+     ********************/
+
     void Start()
     {
         musicSource.volume = GameSettings.bgmVolume;
     }
+
+
+    /******************
+     * CUSTOM METHODS *
+     ******************/
 
     public void StartMusic(string track)
     {

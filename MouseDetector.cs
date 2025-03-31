@@ -6,12 +6,11 @@ using UnityEngine.EventSystems;
 public class MouseDetector : MonoBehaviour
 {
     [SerializeField] private GameControl gameControlScript;
-    [SerializeField] private RotationArrowControl rotationArrowControlScript;
     private Ray ray;
     private RaycastHit hit;
     private string lastRayCastHitObjectName;
     private string selectedObjectTag;
-    private GameObject highlightedArrow = null;
+    private BoardTileScript priorHoveredTileScript = null;
 
     private readonly bool enableDebugging = false;
 
@@ -39,10 +38,10 @@ public class MouseDetector : MonoBehaviour
                     selectedObjectTag = hit.collider.gameObject.tag;
 
                     //handle special logic for rotation arrow highlighting 
-                    if (selectedObjectTag == "RotationArrow")
-                        ArrowHover();
+                    if (selectedObjectTag == "BoardTile")
+                        TileHoverStart();
                     else
-                        NonArrowHover();
+                        TileHoverStop();
 
                     lastRayCastHitObjectName = hit.collider.name;
 
@@ -66,8 +65,8 @@ public class MouseDetector : MonoBehaviour
         }//raycast hit (mouse hovering)
         else
         {
-            NonArrowHover();
-        }//no raycast hit
+            //no raycast hit
+        }
 
     }//update
 
@@ -76,24 +75,26 @@ public class MouseDetector : MonoBehaviour
      * CUSTOM METHODS *
      ******************/
 
-    private void ArrowHover()
+    private void TileHoverStart()
     {
-        //if this is a different arrow we are hovering over now, turn off the old one first. 
-        if (hit.collider.gameObject != highlightedArrow)
-            NonArrowHover();
-
-        highlightedArrow = hit.collider.gameObject;
-        rotationArrowControlScript.SetHighlighting(true, highlightedArrow);
+        BoardTileScript newHoverTileScript = hit.collider.gameObject.GetComponent<BoardTileScript>();
+        //if hovering over a tile which has an active Movement particle effect, intensify it
+        if (newHoverTileScript != priorHoveredTileScript)
+        {
+            if (priorHoveredTileScript != null)
+                priorHoveredTileScript.IntensifyMoveTargetIndicator(false);
+            priorHoveredTileScript = newHoverTileScript;
+            newHoverTileScript.IntensifyMoveTargetIndicator(true);
+        }
     }
 
-    private void NonArrowHover()
+    private void TileHoverStop()
     {
-        if (highlightedArrow != null)
+        if (priorHoveredTileScript != null)
         {
-            rotationArrowControlScript.SetHighlighting(false, highlightedArrow);
-            highlightedArrow = null;
+            priorHoveredTileScript.IntensifyMoveTargetIndicator(false);
+            priorHoveredTileScript = null;
         }
-
     }
 
 

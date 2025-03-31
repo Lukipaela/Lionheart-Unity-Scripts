@@ -1,6 +1,3 @@
-using System.Collections;
-using System.Collections.Generic;
-using Unity.VisualScripting;
 using UnityEngine;
 
 public class BoardTileScript : MonoBehaviour
@@ -80,8 +77,21 @@ public class BoardTileScript : MonoBehaviour
                 attackTargetParticleSystem.Play();
                 break;
         }//switch highlight type
-
     }//toggleHighlighting
+
+    public bool MoveTargetIndicatorIsActive()
+    {
+        return moveTargetParticleSystem.isPlaying;
+    }
+
+    public void IntensifyMoveTargetIndicator(bool enable)
+    {
+        float alphaValue = 0.4235294f;
+        if (enable)
+            alphaValue = 1f;
+        Color color = new Color(0.2277095f, 0.7075472f, 0, alphaValue);
+        moveTargetParticleSystem.GetComponent<ParticleSystemRenderer>().material.SetColor("_Color", color);
+    }
 
     public void ClearAllHighlights()
     {

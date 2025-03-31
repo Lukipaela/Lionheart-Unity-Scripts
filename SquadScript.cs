@@ -538,7 +538,7 @@ public class SquadScript : MonoBehaviour
     /// Can invoke a chain reaction if it runs into another unit. 
     /// </summary>
     /// <param name="distance">How many tiles to try to retreat.</param>
-    /// <param name="distance">The orientation index along which the retreat should be performed.</param>
+    /// <param name="retreatDirection">The orientation index along which the retreat should be performed.</param>
     public IEnumerator Panic(int distance, int retreatDirection)
     {
         ConsolePrint("Squad panicking along orientation index " + retreatDirection + ". Can receive panic: " + soldierClassAttributes.canReceivePanic);

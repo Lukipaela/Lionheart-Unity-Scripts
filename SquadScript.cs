@@ -11,10 +11,11 @@ public class SquadScript : MonoBehaviour
     public int unitsRemaining;
     public UnitSFXLibrary unitSFXLibrary;
 
+    //editor-exposed private attributes
     [SerializeField] private GameControl gameControlScript;
-    private bool isSelected = false;
+
+    //private fields 
     private bool isBlocking = false; //indicates if the most recent animation requested was a block. Allows troops to rotate toward enemy and back again after surviving
-    //animation controls
     private bool isRotating = false;
     private bool isMoving = false;
     private float rotationSpeed = 2.3f;  //holds the actual value used in animation, written to by one of the below constants
@@ -110,47 +111,47 @@ public class SquadScript : MonoBehaviour
             ConsolePrint("Moving to animation: " + currentAnimationTask.animationType);
             switch (currentAnimationTask.animationType)
             {
-                case "Block":
+                case AnimationType.Block:
                     //rotate towards attacker, then block
                     isBlocking = true;
-                    AnimateSquad(-1, "Rotate", currentAnimationTask.targetVector);
-                    AnimateSquad(-1, "Block", Vector3.one);
+                    AnimateSquad(-1, AnimationType.Rotate, currentAnimationTask.targetVector);
+                    AnimateSquad(-1, AnimationType.Block, Vector3.one);
                     break;
 
-                case "Cheer":
-                    AnimateSquad(-1, "Cheer", Vector3.one);
-                    AnimateSquad(-1, "Idle", Vector3.one);
+                case AnimationType.Cheer:
+                    AnimateSquad(-1, AnimationType.Cheer, Vector3.one);
+                    AnimateSquad(-1, AnimationType.Idle, Vector3.one);
                     break;
 
-                case "Die":
-                    AnimateSquad(-1, "Die", Vector3.one);
+                case AnimationType.Die:
+                    AnimateSquad(-1, AnimationType.Die, Vector3.one);
                     SquadLost();
                     break;
 
-                case "Idle":
+                case AnimationType.Idle:
                     if (isBlocking)
                     {
                         //if we were blocking before, rotate back forwards before going to idle
                         isBlocking = false;
-                        AnimateSquad(-1, "Rotate", transform.forward);
+                        AnimateSquad(-1, AnimationType.Rotate, transform.forward);
                     }
-                    AnimateSquad(-1, "Idle", Vector3.one);
+                    AnimateSquad(-1, AnimationType.Idle, Vector3.one);
                     break;
 
-                case "MoveSquad":
+                case AnimationType.MoveSquad:
                     isMoving = true;
-                    AnimateSquad(-1, "March", Vector3.one);
+                    AnimateSquad(-1, AnimationType.March, Vector3.one);
                     break;
 
-                case "RotateSquad":
+                case AnimationType.RotateSquad:
                     isRotating = true;
                     break;
 
-                case "RotateUnits":
-                    AnimateSquad(-1, "Rotate", currentAnimationTask.targetVector);
+                case AnimationType.RotateUnits:
+                    AnimateSquad(-1, AnimationType.Rotate, currentAnimationTask.targetVector);
                     break;
 
-                case "SqaudAttack":
+                case AnimationType.SqaudAttack:
                     GenerateAttackAnimationQueue(currentAnimationTask);
                     break;
 
@@ -208,17 +209,17 @@ public class SquadScript : MonoBehaviour
                         walkDistance = 0.45f;
                     //walk forward to the target's tile, maintaining formation
                     Vector3 thisUnitLocation = thisUnitScript.transform.position;
-                    thisUnitScript.AddAnimationToQueue("March", thisUnitLocation + (positionDelta * walkDistance));
+                    thisUnitScript.AddAnimationToQueue(AnimationType.March, thisUnitLocation + (positionDelta * walkDistance));
                     //animate the attack
-                    thisUnitScript.AddAnimationToQueue("Attack", Vector3.one);
+                    thisUnitScript.AddAnimationToQueue(AnimationType.Attack, Vector3.one);
                     //turn to face the origin tile
-                    thisUnitScript.AddAnimationToQueue("Rotate", thisUnitScript.transform.forward * -1);
+                    thisUnitScript.AddAnimationToQueue(AnimationType.Rotate, thisUnitScript.transform.forward * -1);
                     //return to the origin tile
-                    thisUnitScript.AddAnimationToQueue("March", thisUnitLocation);
+                    thisUnitScript.AddAnimationToQueue(AnimationType.March, thisUnitLocation);
                     //turn back to face forward again
-                    thisUnitScript.AddAnimationToQueue("Rotate", thisUnitScript.transform.forward);
+                    thisUnitScript.AddAnimationToQueue(AnimationType.Rotate, thisUnitScript.transform.forward);
                     //go back to idle
-                    thisUnitScript.AddAnimationToQueue("Idle", Vector3.one);
+                    thisUnitScript.AddAnimationToQueue(AnimationType.Idle, Vector3.one);
                 }
                 break;
 
@@ -229,21 +230,21 @@ public class SquadScript : MonoBehaviour
                 foreach (UnitScript thisUnitScript in unitList)
                 {
                     //walk forward to the target's tile, maintaining formation
-                    thisUnitScript.AddAnimationToQueue("Rotate", angleToTarget);
+                    thisUnitScript.AddAnimationToQueue(AnimationType.Rotate, angleToTarget);
                     //animate the attack
-                    thisUnitScript.AddAnimationToQueue("Attack", currentAnimationTask.targetVector);
+                    thisUnitScript.AddAnimationToQueue(AnimationType.Attack, currentAnimationTask.targetVector);
                     //turn back to face forward again
-                    thisUnitScript.AddAnimationToQueue("Rotate", thisUnitScript.transform.forward);
+                    thisUnitScript.AddAnimationToQueue(AnimationType.Rotate, thisUnitScript.transform.forward);
                     //go back to idle
-                    thisUnitScript.AddAnimationToQueue("Idle", Vector3.one);
+                    thisUnitScript.AddAnimationToQueue(AnimationType.Idle, Vector3.one);
                 }
                 break;
         }//switch squadtype
     }//GenerateAttackAnimationQueue
 
-    public void AnimateSquad(int soldiersToAnimate, string animationType, Vector3 animationVector)
+    public void AnimateSquad(int soldiersToAnimate, AnimationType animationType, Vector3 animationVector)
     {
-        ConsolePrint("Animation " + animationType + " requested for " + soldiersToAnimate + " units of type " + soldierClassAttributes.soldierClass);
+        ConsolePrint("Animation " + animationType.ToString() + " requested for " + soldiersToAnimate + " units of type " + soldierClassAttributes.soldierClass);
 
         if (soldiersToAnimate == -1) //default used to mean "all units do this animation"
             soldiersToAnimate = unitList.Count;
@@ -263,8 +264,8 @@ public class SquadScript : MonoBehaviour
         ConsolePrint("Panic death triggered");
         occupiedGameTile.GetComponent<BoardTileScript>().ClearTile();
         occupiedGameTile = null;
-        animationQueue.Add(new AnimationTask("MoveSquad", transform.position + (marchVector.normalized * 1.1f)));
-        animationQueue.Add(new AnimationTask("Die", Vector3.one));
+        animationQueue.Add(new AnimationTask(AnimationType.MoveSquad, transform.position + (marchVector.normalized * 1.1f)));
+        animationQueue.Add(new AnimationTask(AnimationType.Die, Vector3.one));
     }
 
 
@@ -276,7 +277,6 @@ public class SquadScript : MonoBehaviour
     public void SetSelected(bool selected)
     {
         ConsolePrint("Set Selected " + selected + " called");
-        isSelected = selected;
         if (selected)
         {
             occupiedGameTile.GetComponent<BoardTileScript>().EnableHighlight("Selected");
@@ -529,7 +529,7 @@ public class SquadScript : MonoBehaviour
     public void Attack(GameObject attackTarget)
     {
         ConsolePrint("Squad attacking");
-        animationQueue.Add(new AnimationTask("SqaudAttack", attackTarget.transform.position));
+        animationQueue.Add(new AnimationTask(AnimationType.SqaudAttack, attackTarget.transform.position));
     }//attack
 
     /// <summary>
@@ -633,7 +633,7 @@ public class SquadScript : MonoBehaviour
         else
             movementSpeed = activeGameMovementSpeed;
 
-        animationQueue.Add(new AnimationTask("MoveSquad", occupiedGameTile.transform.position));
+        animationQueue.Add(new AnimationTask(AnimationType.MoveSquad, occupiedGameTile.transform.position));
     }//move Location
 
     public void RotateSquad(RotationCommand rotationCommand)
@@ -656,7 +656,7 @@ public class SquadScript : MonoBehaviour
         else
             rotationSpeed = activeGameRotationSpeed;
 
-        animationQueue.Add(new AnimationTask("RotateSquad", rotationTargetVector));
+        animationQueue.Add(new AnimationTask(AnimationType.RotateSquad, rotationTargetVector));
     }//RotateSquad
 
     /// <summary>
@@ -666,7 +666,7 @@ public class SquadScript : MonoBehaviour
     public void Defend(Vector3 blockDirection)
     {
         //called when this squad is under attack 
-        AnimationTask thisAnimationTask = new AnimationTask("Block", blockDirection);
+        AnimationTask thisAnimationTask = new AnimationTask(AnimationType.Block, blockDirection);
         animationQueue.Add(thisAnimationTask);
     } //defend
 
@@ -675,7 +675,7 @@ public class SquadScript : MonoBehaviour
         //called when an attack on this squad has ended.
         if (unitsRemaining > 0)
         {
-            animationQueue.Add(new AnimationTask("Idle", Vector3.one));
+            animationQueue.Add(new AnimationTask(AnimationType.Idle, Vector3.one));
         }
     } //idle
 
@@ -685,7 +685,7 @@ public class SquadScript : MonoBehaviour
     public void Cheer()
     {
         //called at the start of the turn, or at game over for the winner
-        animationQueue.Add(new AnimationTask("Cheer", Vector3.one));
+        animationQueue.Add(new AnimationTask(AnimationType.Cheer, Vector3.one));
     }
 
     /// <summary>

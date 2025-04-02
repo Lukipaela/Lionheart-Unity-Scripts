@@ -1,29 +1,15 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
-public class UnitScript : MonoBehaviour
+public class UnitScript : CharacterScript
 {
-    public bool isCaptain = false;  //captain is designated to play sounds that apply to the whole squad together, like marching sfx and (future) greetings / responses
+    //public
     public SquadScript parentSquadScript;
-    public string animationState = "Idle";
 
-    //animation controls
-    [SerializeField] private AudioSource oneShotAudioSource;
-    [SerializeField] private AudioSource loopingAudioSource;
-    [SerializeField] private SkinnedMeshRenderer bodyMesh;
-    [SerializeField] private ParticleSystem bloodParticleSystem;
-    [SerializeField] private ParticleSystem sparkParticleSystem;
-    [SerializeField] private ParticleSystem speechParticleSystem;
+    //private
     [SerializeField] private SoldierClass unitClass;    //archer, knight, etc
-    private readonly int rotationSpeed = 3;
-    private readonly int movementSpeed = 1;
-    private List<AnimationTask> animationQueue = new List<AnimationTask>();
-    private AnimationTask currentAnimationTask;
-    private bool isDead = false;
 
-    //debug
-    private readonly bool enableDebugging = false;
+    //debug - override CharacterScript logging at Unit level
+    new private readonly bool enableDebugging = true;
 
 
     /********************
@@ -32,22 +18,7 @@ public class UnitScript : MonoBehaviour
 
     void Update()
     {
-        if (currentAnimationTask == null)
-        {
-            animationState = "Idle";
-            CheckAnimationQueue();
-        }//no longer animating
-        else if (animationState == "Rotating")
-        {
-            RotationFrameUpdate(currentAnimationTask.targetVector);
-        }//rotating logic
-        else if (animationState == "Marching")
-        {
-            MovementFrameUpdate(currentAnimationTask.targetVector);
-        }//moving logic
-
-        if (loopingAudioSource != null && loopingAudioSource.isPlaying && animationState != "Marching" && animationState != "Rotating" && animationState != "SquadMarching" && isCaptain)
-            loopingAudioSource.Stop();
+        CharacterFrameUpdate();
     }//Update
 
 
@@ -56,57 +27,12 @@ public class UnitScript : MonoBehaviour
      * ANIMATION METHODS *
      *********************/
 
-    /// <summary>
-    /// Should be called by a repeating method (like Update), as it only turns one frame's distance per call.
-    /// Rotates the unit toward the specified vector until the unit's Forward vector matches it in direction.
-    /// </summary>
-    /// <param name="desiredForwardVector">The coordinates of the location this unit is sliding towards.</param>
-    private void RotationFrameUpdate(Vector3 desiredForwardVector)
-    {
-        // Calculate a rotation a step closer to the target and apply rotation to this object
-        Vector3 newDirection = Vector3.RotateTowards(gameObject.transform.forward, desiredForwardVector, rotationSpeed * Time.deltaTime, 0.0f);
-        gameObject.transform.rotation = Quaternion.LookRotation(newDirection);
-        //if we have reached our target orientation, stop rotating.
-        if (Vector3.Angle(gameObject.transform.forward, desiredForwardVector) < 1)
-        {
-            ConsolePrint("Rotation complete.");
-            animationState = "Idle";
-            currentAnimationTask = null;
-        }
-    }//RotationFrameUpdate
 
     /// <summary>
-    /// Should be called by a repeating method (like Update), as it only moves one frame's distance per call.
-    /// Physically move the unit toward the designated target. Should usually be accompanied by a Walk animation.
+    /// Overides the method from the CharacterScript to perform animations related to an active game piece.
+    /// Will pull the next animation from the queue and run it if the queue is not empty, and the character is idle.
     /// </summary>
-    /// <param name="desiredLocation">The coordinates of the location this unit is sliding towards.</param>
-    private void MovementFrameUpdate(Vector3 desiredLocation)
-    {
-        gameObject.transform.position = Vector3.MoveTowards(gameObject.transform.position, desiredLocation, movementSpeed * Time.deltaTime);
-        if (gameObject.transform.position == desiredLocation)
-        {
-            ConsolePrint("Movement complete.");
-            animationState = "Idle";
-            currentAnimationTask = null;
-        }//done moving
-    } //MovementFrameUpdate
-
-    /// <summary>
-    /// Receives an animation request by description, and converts it to an AnimationTask object and adds it to the queue.
-    /// Ignores request if the unit has been marked as dead.
-    /// </summary>
-    /// <param name="animationType">The name of the animation bewing requested.</param>
-    /// <param name="animationVector">The vector associated with that animation, iof any. Usually used for rotation animations.</param>
-    public void AddAnimationToQueue(string animationType, Vector3 animationVector)
-    {
-        if (!isDead)
-        {
-            AnimationTask nextTask = new AnimationTask(animationType, animationVector);
-            animationQueue.Add(nextTask);
-        }//not dead
-    }//AddAnimationToQueue
-
-    private void CheckAnimationQueue()
+    protected override void CheckAnimationQueue()
     {
         // if not currently doing anything, check the animation queue for a new action. 
         if (animationQueue.Count > 0)
@@ -117,44 +43,44 @@ public class UnitScript : MonoBehaviour
 
             switch (currentAnimationTask.animationType)
             {
-                case "March":
+                case AnimationType.March:
                     if (currentAnimationTask.targetVector == Vector3.one)
-                        animationState = "SquadMarching";   //need to animate, but not physically move the unit. requires explicit order to stop.
+                        animationState = AnimationState.SquadMarching;   //need to animate, but not physically move the unit. requires explicit order to stop.
                     else
-                        animationState = "Marching";
-                    AnimateUnit("March");
+                        animationState = AnimationState.Marching;
+                    Animate(AnimationType.March);
                     StartCoroutine(PlaySound(parentSquadScript.GetUnitSoundEffect("Movement"), useRandomDelay: false, looping: true, triggerVocalEffect: false));
                     break;
 
-                case "Rotate":
-                    animationState = "Rotating";
-                    AnimateUnit("March");
+                case AnimationType.Rotate:
+                    animationState = AnimationState.Rotating;
+                    Animate(AnimationType.March);
                     StartCoroutine(PlaySound(parentSquadScript.GetUnitSoundEffect("Movement"), useRandomDelay: false, looping: true, triggerVocalEffect: false));
                     break;
 
-                case "Attack":
-                    animationState = "Attacking";
-                    AnimateUnit("Attack");
+                case AnimationType.Attack:
+                    animationState = AnimationState.Attacking;
+                    Animate(AnimationType.Attack);
                     break;
 
-                case "Idle":
-                    animationState = "Idle";
-                    AnimateUnit("Idle");
+                case AnimationType.Idle:
+                    animationState = AnimationState.Idle;
+                    Animate(AnimationType.Idle);
                     currentAnimationTask = null;
                     break;
 
-                case "Block":
-                    animationState = "Blocking";
-                    AnimateUnit("Block");
+                case AnimationType.Block:
+                    animationState = AnimationState.Blocking;
+                    Animate(AnimationType.Block);
                     break;
 
-                case "Cheer":
-                    animationState = "Cheering";
-                    AnimateUnit("Cheer");
+                case AnimationType.Cheer:
+                    animationState = AnimationState.Cheering;
+                    Animate(AnimationType.Cheer);
                     break;
 
-                case "Die":
-                    animationState = "Dying";
+                case AnimationType.Die:
+                    animationState = AnimationState.Dying;
                     Die();
                     break;
             }//animation type switch 
@@ -168,12 +94,12 @@ public class UnitScript : MonoBehaviour
     public void Die()
     {
         //rotate a few degrees around the Y axis at random before animating the death, for variety 
-        int rotationAmount = Random.Range(-35, 35); //measured in degrees
+        int rotationAmount = UnityEngine.Random.Range(-35, 35); //measured in degrees
         Quaternion rotationToApply = Quaternion.Euler(0f, rotationAmount, 0f);
         transform.rotation = transform.rotation * rotationToApply;
         //call the death animation, mark unit dead and animating
         bloodParticleSystem.Play();
-        AnimateUnit("Die");
+        Animate(AnimationType.Die);
         //if the death was that of a knight, also call a horse scream sound effect
         if (unitClass == SoldierClass.Knight)
             StartCoroutine(PlaySound(parentSquadScript.GetUnitSoundEffect("Horse")
@@ -203,22 +129,13 @@ public class UnitScript : MonoBehaviour
     }
 
     /// <summary>
-    /// Issues the command to the Animator to trigger the requested animation.
-    /// </summary>
-    /// <param name="animationName">The name of the animation bewing requested.</param>
-    private void AnimateUnit(string animationName)
-    {
-        transform.GetComponent<Animator>().SetTrigger(animationName);
-    }//animateUnit
-
-    /// <summary>
     /// Adds Idle to the animation queue. Clears currentAnimationTask. 
     /// Separated to a non-parameterized method to facilitate the use of Invoke().
     /// </summary>
     public void AddIdleTask()
     {
         currentAnimationTask = null;
-        AddAnimationToQueue("Idle", Vector3.one);
+        AddAnimationToQueue(AnimationType.Idle, Vector3.one);
     }
 
 
@@ -226,47 +143,6 @@ public class UnitScript : MonoBehaviour
     /*************
      * UTILITIES *
      *************/
-
-    /// <summary>
-    /// called by GameControl at the start of the game, or when a mercenary is converted (future feature) to add team-based color to the soldiers' bodies.
-    /// </summary>
-    /// <param name="teamColor">The color associated with the team which now owns the unit.</param>
-    public void SetColor(Color teamColor)
-    {
-        bodyMesh.material.color = teamColor;
-    }
-
-    /// <summary>
-    /// Stops current sound (if any), and plays the requested track. Optionally can inseret a small random offset delay before starting, and can be made to loop.
-    /// </summary>
-    /// <param name="soundToPlay">The Audio Clip to be played.</param>
-    /// <param name="useRandomDelay">Indicates if a small random delay should be imposed before playing the clip. 
-    /// This helps prevent all members of the squad from playinmg the same sound at exactly the same moment, stacking the volume.</param>
-    /// <param name="loopTrack">Indicates if the sound should loop indefinitely (until explicitly cancelled by some other process).</param>
-    private IEnumerator PlaySound(SoundFile soundFileToPlay, bool useRandomDelay, bool looping, bool triggerVocalEffect)
-    {
-        ConsolePrint("Playing track: " + soundFileToPlay.audioClip.name);
-        float delay = 0;
-        if (useRandomDelay)
-            delay = Random.Range(0.001f, 0.1f);
-        yield return new WaitForSeconds(delay);
-
-        if (looping)
-        {
-            if (isCaptain)//looping currently only means Marching, and only the captain makes those sounds (else it's chaos)
-            {
-                loopingAudioSource.clip = soundFileToPlay.audioClip;
-                loopingAudioSource.volume = soundFileToPlay.volume;
-                loopingAudioSource.Play();
-            }
-        }
-        else
-            oneShotAudioSource.PlayOneShot(soundFileToPlay.audioClip, soundFileToPlay.volume);
-
-        if (triggerVocalEffect)
-            speechParticleSystem.Play();
-    }//PlaySound
-
 
 
     /**********
@@ -385,11 +261,15 @@ public class UnitScript : MonoBehaviour
     }
 
 
+
     /***************
      * DEBUG STUFF *
      ***************/
 
-    public void ConsolePrint(string message)
+    /// <summary>
+    /// Overrides the version of this method defined by the parent class CharacterScript
+    /// </summary>
+    new private void ConsolePrint(string message)
     {
         if (enableDebugging == true)
         {

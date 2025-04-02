@@ -1,9 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEditor;
-using UnityEngine.UI;
-using Unity.VisualScripting;
 
 
 public class GameControl : MonoBehaviour
@@ -756,6 +753,9 @@ public class GameControl : MonoBehaviour
     /// Rotates the squad, if valid.
     /// Should really be moved to HUDControl, but is here as an artifact from when the rotation was controlled by a 3d object in-game.
     /// </summary>
+    /// <param name="rotationCommand_str">A string-formatted version of a rotationCommand. 
+    /// Must be a string, as it's set via the inspector which does not support enums. 
+    /// This value is immediately converted to the enum version.</param>
     public void RotationArrowClicked(string rotationCommand_str)
     {
         ConsolePrint("Rotation arrow clicked.");

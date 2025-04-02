@@ -2,7 +2,17 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class RotationArrowControl : MonoBehaviour{
+/**************************************************************
+****            THIS SCRIPT HAS BEEN DEPRECATED            ****
+***************************************************************
+* I am leaving this script here for reference,                *
+* or to support reversion if player testing determines        *
+* that the new rotation mechanic is not user-friendly enough. *
+***************************************************************/
+
+
+public class RotationArrowControl : MonoBehaviour
+{
     public GameObject leftArrow;
     public GameObject rightArrow;
     public GameObject mainCamera;
@@ -19,26 +29,27 @@ public class RotationArrowControl : MonoBehaviour{
      * BUILT-IN METHODS *
      ********************/
 
-    void Start(){
+    void Start()
+    {
         HideArrows();
     }
 
-    void Update(){       
-    }//update
 
 
     /******************
      * CUSTOM METHODS *
      ******************/
 
-    public void AssignToSquad( GameObject squad){
+    public void AssignToSquad(GameObject squad)
+    {
         ConsolePrint("Assigning rotation arrows.");
         associatedSquad = squad;
         transform.position = associatedSquad.transform.position;
         transform.forward = associatedSquad.transform.forward;
     }//assign to squad
 
-    public void HideArrows(){
+    public void HideArrows()
+    {
         ConsolePrint("Hiding rotation arrows.");
         associatedSquad = null;
         //reset rotation of the object, and hide it in a tent
@@ -47,15 +58,17 @@ public class RotationArrowControl : MonoBehaviour{
         transform.up = Vector3.up;
     }//HideArrows
 
-    public void SetHighlighting (bool enabled, GameObject arrow ){
+    public void SetHighlighting(bool enabled, GameObject arrow)
+    {
         if (enabled)
             arrow.GetComponent<MeshRenderer>().material = highlightedMaterial;
         else
             arrow.GetComponent<MeshRenderer>().material = standardMaterial;
-        
+
     }//set highlighting 
 
-    public string GetDirection( GameObject arrow){
+    public string GetDirection(GameObject arrow)
+    {
         if (arrow == leftArrow)
             return "Left";
 
@@ -71,8 +84,10 @@ public class RotationArrowControl : MonoBehaviour{
      * DEBUG STUFF *
      ***************/
 
-    public void ConsolePrint(string message){
-        if (enableDebugging == true){
+    public void ConsolePrint(string message)
+    {
+        if (enableDebugging == true)
+        {
             Debug.Log("Rotation Arrow Control Script - " + message);
         }
     }//console

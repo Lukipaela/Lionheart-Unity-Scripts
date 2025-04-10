@@ -57,7 +57,7 @@ public class SpectatorControl : MonoBehaviour
         randomEventTimer = Random.Range(15, 25);
         //Lock out further animation triggers until this one is reported complete
         randomEventActive = true;
-        SpectatorAnimation animation = (SpectatorAnimation)Random.Range(0, System.Enum.GetValues(typeof(SpectatorAnimation)).Length);
+        SpectatorAnimation animation = SpectatorAnimation.MercenariesVsInfantry; //(SpectatorAnimation)Random.Range(0, System.Enum.GetValues(typeof(SpectatorAnimation)).Length);
         switch (animation)
         {
             case SpectatorAnimation.TentWalk:
@@ -76,10 +76,7 @@ public class SpectatorControl : MonoBehaviour
                 animatingGroups = 1;
                 break;
             case SpectatorAnimation.HeavyInfantryVsArchers:
-                // EVENT 3: a pair of heavy infantry invaders advance up the right side of the board, then stop and defend. 
-                // a group of defender archers approach from the castle side and fire on them. 
-                // defenders block, with spark effect 
-                // all units return to their original positions. 
+                // EVENT 3: a pair of heavy infantry invaders advance to a brief skirmish with a group of enemy archers
                 heavyInfantryGroup.Animate(animation);
                 archerGroup.Animate(animation);
                 animatingGroups = 2;

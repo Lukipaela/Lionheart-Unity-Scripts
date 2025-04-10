@@ -9,7 +9,7 @@ public class UnitScript : CharacterScript
     [SerializeField] private SoldierClass unitClass;    //archer, knight, etc
 
     //debug - override CharacterScript logging at Unit level
-    new private readonly bool enableDebugging = true;
+    new private readonly bool enableDebugging = false;
 
 
     /********************

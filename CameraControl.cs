@@ -28,7 +28,7 @@ public class CameraControl : MonoBehaviour
     private float cameraZoom_combat = 1;
     private float cameraZoom_default = 3.5f;
 
-    private static readonly bool enableDebugging = false; //switch to enable/disable console logging for this script
+    private static readonly bool enableDebugging = true; //switch to enable/disable console logging for this script
 
 
     /********************

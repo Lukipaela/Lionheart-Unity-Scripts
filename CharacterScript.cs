@@ -25,7 +25,7 @@ public abstract class CharacterScript : MonoBehaviour
     protected bool isDead = false;
 
     //debug
-    protected readonly bool enableDebugging = true;
+    protected readonly bool enableDebugging = false;
 
 
 

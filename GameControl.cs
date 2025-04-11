@@ -5,25 +5,25 @@ using UnityEngine;
 
 public class GameControl : MonoBehaviour
 {
-    // PUBLIC VARS
+    // PUBLIC
     public GamePhase gamePhase;    //PlaceArmyP1, PlaceArmyP2, DiceRoll, ActiveGame, GameOver, RollForFirst
     public int activePlayerID = 0;
     public PlayerScript[] playerScripts;
+    public GameObject currentSelectedSquad;
 
     //PRIVATE VARS (Serialized fields are accessible within the editor, but aren't exposed to other scripts as a facet of this class)
     [SerializeField] private GameObject[] ReferenceCenterTiles;
     [SerializeField] private LightingControl lightControlScript;
     [SerializeField] private AudioControl audioControlScript;
-    //[SerializeField] private RotationArrowControl rotationArrowControlScript;
     [SerializeField] private HUDControlScript hudControlScript;
     [SerializeField] private GameOverPanelScript gameOverPanelScript;
     [SerializeField] private InfoPanelScript infoPanelScript;
     [SerializeField] private DieSpawner dieSpawnerScript;
     [SerializeField] private CameraControl cameraControlScript;
-    public GameObject currentSelectedSquad;
+
+    //private
     private string squadToPlacePrefabAddress;
     private string placementState;//indicates if the player is choosing a squad to place, or choosing a location to place a squad: Idle , PlacingSquad
-    //variables for determining turn order
     private int[] playerScore = new int[] { 0, 0 };
     private bool diceRollIsValid = false;
     private bool waitingForAttack = false; // a trigger to coordinate the timing of the attack animation and the death animation in a battle 
@@ -31,8 +31,9 @@ public class GameControl : MonoBehaviour
     private bool actionTaken = false;   //indicates if some ap-consuming action has been taken in this loop
     private CombatData combatData;
     private ObjectHider armyHider;
+
     //debug
-    private readonly bool enableDebugging = false; //switch to enable/disable console logging for this script
+    private readonly bool enableDebugging = true; //switch to enable/disable console logging for this script
 
 
 
@@ -108,28 +109,6 @@ public class GameControl : MonoBehaviour
         placementState = "PlacingSquad";
         DeselectPreviousSquad();
     }
-
-    /// <summary>
-    /// Tell the camera where to move to, and indicate if the system should wait for the movement to end before continuing to read inputs.
-    /// </summary>
-    /// <param name="cameraPhase">See CameraControl for a list of valid values camera phases</param>
-    /// <param name="waitUntilComplete">If true, will pause untiul the camera stops moving. Else will return control immediately while the camera is in motion.</param>
-    /// <returns></returns>
-    private IEnumerator AnimateCamera(string cameraPhase, bool waitUntilComplete)
-    {
-        ConsolePrint("Camera animation requested - " + cameraPhase);
-        cameraControlScript.SetCameraGamePhase(cameraPhase);
-        if (waitUntilComplete)
-        {
-            while (cameraControlScript.animating)
-            {
-                yield return new WaitForSeconds(0.1f);
-            }
-        }
-        else
-            yield break;
-
-    }//begin army placement 
 
 
 
@@ -250,7 +229,7 @@ public class GameControl : MonoBehaviour
             activePlayerID = 0;
             gamePhase = GamePhase.PlaceArmyP1;
             placementState = "Idle";
-            StartCoroutine(AnimateCamera("PlayerOneSetup", true));
+            cameraControlScript.SetCameraGamePhase("PlayerOneSetup");
             hudControlScript.InitializeSquadPlacementUI(activePlayerID);
         }
         else if (playerID == 1)
@@ -258,7 +237,7 @@ public class GameControl : MonoBehaviour
             activePlayerID = 1;
             gamePhase = GamePhase.PlaceArmyP2;
             placementState = "Idle";
-            StartCoroutine(AnimateCamera("PlayerTwoSetup", true));
+            cameraControlScript.SetCameraGamePhase("PlayerTwoSetup");
             hudControlScript.InitializeSquadPlacementUI(activePlayerID);
         }
 
@@ -268,7 +247,7 @@ public class GameControl : MonoBehaviour
     {
         ConsolePrint("Beginning Game");
         gamePhase = GamePhase.Active;
-        StartCoroutine(AnimateCamera("ActiveGame", false));
+        cameraControlScript.SetCameraGamePhase("ActiveGame");
         //after both teams have been rendered, update their soldier's skin tones to match the team they belong to.
         AssignTeamColors();
         //tell player script to start
@@ -361,12 +340,11 @@ public class GameControl : MonoBehaviour
         ClearAllUnits();
         lightControlScript.SetTimeCycleMode(GameSettings.timeCycleMode);    //restart time cycling, as this paused during gameover
         activePlayerID = 0;
+        cameraControlScript.DisableCombatCamera();
         if (GameSettings.gameMode == GameMode.QuickStart)
             QuickStart();
         else
-        {
             BeginArmyPlacement(activePlayerID);
-        }
     }
 
 
@@ -440,15 +418,14 @@ public class GameControl : MonoBehaviour
             ConsolePrint("Not a bonus roll.");
             //create combat object to house related data  if not a reroll
             combatData = new CombatData(attacker, defender);
-            hudControlScript.PrintMessage(GameSettings.playerNames[activePlayerID] + " - Press SPACE to roll when ready. Attacking with " + combatData.attackType + " dice.");
+            hudControlScript.PrintMessage(GameSettings.playerNames[activePlayerID] + " - roll when ready. Attacking with " + combatData.attackType + " dice.");
         }
         else
         {
             hudControlScript.PrintMessage("Bonus roll earned! Roll successfully a second time to kill the armored target.");
             ConsolePrint("Bonus roll attack beginning.");
         }
-
-        StartCoroutine(AnimateCamera("DiceRoll", true));
+        cameraControlScript.SetCameraGamePhase("DiceRoll");
     }//attack
 
     private IEnumerator ResolveAttack()
@@ -504,13 +481,13 @@ public class GameControl : MonoBehaviour
             {
                 case "AttackerPanics":
                     ConsolePrint("Attacker panicks");
-                    StartCoroutine(AnimateCamera("ActiveGame", true));
+                    cameraControlScript.SetCameraGamePhase("ActiveGame");
                     StartCoroutine(combatData.attackerSquadScript.Panic(combatData.panicDistance, (combatData.attackerSquadScript.orientationIndex + 2) % 4));
                     DeselectPreviousSquad();
                     break;
                 case "DefenderPanics":
                     ConsolePrint("Defender panicks");
-                    StartCoroutine(AnimateCamera("ActiveGame", true));
+                    cameraControlScript.SetCameraGamePhase("ActiveGame");
                     StartCoroutine(combatData.defenderSquadScript.Panic(combatData.panicDistance, combatData.attackerSquadScript.orientationIndex));
                     break;
                 default:
@@ -528,7 +505,7 @@ public class GameControl : MonoBehaviour
             }
             if (gamePhase != GamePhase.GameOver)
             {
-                StartCoroutine(AnimateCamera("ActiveGame", true));
+                cameraControlScript.SetCameraGamePhase("ActiveGame");
                 gamePhase = GamePhase.Active;
             }
         }
@@ -832,7 +809,7 @@ public class GameControl : MonoBehaviour
         //hide the squad placement panel 
         hudControlScript.HideSquadPlacementPanel();
         //set camera to Dice Roll angle mode
-        StartCoroutine(AnimateCamera("DiceRoll", true));
+        cameraControlScript.SetCameraGamePhase("DiceRoll");
         //give the player instructions
         hudControlScript.PrintMessage("Roll to see who goes first! " + GameSettings.playerNames[0] + ", hit SPACE to roll when ready.");
         //enable dice rolls
@@ -881,7 +858,7 @@ public class GameControl : MonoBehaviour
                 switch (activePlayerID)
                 {
                     case 0:
-                        hudControlScript.PrintMessage(GameSettings.playerNames[0] + " scored a " + dieSpawnerScript.diceData.axeCount + ". " + GameSettings.playerNames[1] + " Press SPACE to roll.");
+                        hudControlScript.PrintMessage(GameSettings.playerNames[0] + " scored a " + dieSpawnerScript.diceData.axeCount + ". " + GameSettings.playerNames[1] + " Roll when ready.");
                         activePlayerID = 1;
                         diceRollIsValid = true;
                         hudControlScript.ToggleDiceRollButtonVisibility();

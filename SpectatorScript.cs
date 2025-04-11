@@ -9,9 +9,6 @@ using UnityEngine;
 /// </summary>
 public class SpectatorScript : CharacterScript
 {
-    //publics
-    public bool isAnimating = false;
-
     //private attributes exposed in the UI 
     [SerializeField] private int playerID;
     [SerializeField] private SpectatorGroupScript parentGroupScript;
@@ -21,7 +18,8 @@ public class SpectatorScript : CharacterScript
     private float loopAttackCooldown = 0;
 
     //debug - override CharacterScript logging at Unit level
-    [SerializeField] new private bool enableDebugging = true;
+    new private bool enableDebugging = false;
+
 
 
     /********************
@@ -203,7 +201,7 @@ public class SpectatorScript : CharacterScript
     /// </summary>
     public void AttackHit()
     {
-        if (isCaptain && currentAnimationTask != null && currentAnimationTask.animationType != AnimationType.IdleAttacking)
+        if (isCaptain && currentAnimationTask != null && currentAnimationTask.animationType == AnimationType.Attack)
         {
             ConsolePrint("Reporting attack hit to group.");
             parentGroupScript.ReportAttackHit();
@@ -219,6 +217,7 @@ public class SpectatorScript : CharacterScript
         if (currentAnimationTask != null && currentAnimationTask.animationType != AnimationType.WaitForCue)
             currentAnimationTask = null;
     }
+
 
 
     /***************

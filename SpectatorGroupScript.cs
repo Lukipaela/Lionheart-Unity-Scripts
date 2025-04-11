@@ -6,7 +6,6 @@ using UnityEngine;
 
 public class SpectatorGroupScript : MonoBehaviour
 {
-
     //private, but exposed in UI
     [SerializeField] private List<SpectatorScript> spectatorList = new List<SpectatorScript>(); //list of all characters in the group, for distributing animation commands
     [SerializeField] private List<Transform> targetLocationList = new List<Transform>();    //a list of Transforms used by this group's animations (locations, and orientation angles)
@@ -22,7 +21,7 @@ public class SpectatorGroupScript : MonoBehaviour
     private float delayTimer = 1;
 
     //debug
-    [SerializeField] private bool enableDebugging = true;
+    private bool enableDebugging = false;
 
 
     /********************
@@ -62,8 +61,6 @@ public class SpectatorGroupScript : MonoBehaviour
     /// <param name="requestedAnimation">The name of the animation being requested.</param>
     public void Animate(SpectatorAnimation requestedAnimation)
     {
-        //initialize outside switch scope
-        float delayValue = 0;
         //assemble animation queues based on animation requested
         switch (requestedAnimation)
         {
@@ -80,12 +77,7 @@ public class SpectatorGroupScript : MonoBehaviour
                 AddAnimationToQueue(AnimationType.MoveSquad, targetLocationList[1].position);
                 // pause for a duration (SPECTATOR idle [duration])
                 AnimateSpectators(AnimationType.Idle, Vector3.one);
-                AnimateSpectators(AnimationType.WaitForCue, Vector3.one);
-                delayValue = UnityEngine.Random.Range(5, 15);
-                AddAnimationToQueue(AnimationType.Delay, Vector3.one * delayValue);
-                // initiate walk animation (SPECTATOR walk)
-                AddAnimationToQueue(AnimationType.Cue, Vector3.one);
-                AddAnimationToQueue(AnimationType.WaitForCue, Vector3.one);
+                AnimationDelay(UnityEngine.Random.Range(5, 15));
                 // rotate to look at original position (SPECTATORS look at transform 0)
                 AnimateSpectators(AnimationType.Rotate, targetLocationList[0].position - targetLocationList[1].position);
                 AnimateSpectators(AnimationType.Cue, Vector3.one);
@@ -104,47 +96,23 @@ public class SpectatorGroupScript : MonoBehaviour
 
             case SpectatorAnimation.WanderingInfantry:
                 // march around the left sideline, moving to position, facing their king and pausing, then moving back to their starting position, facing board center. 
-                // Rotate group to first orientation
                 AddAnimationToQueue(AnimationType.WaitForCue, Vector3.one);
-                AnimateSpectators(AnimationType.Rotate, targetLocationList[0].position - targetLocationList[1].position);
-                AnimateSpectators(AnimationType.Cue, Vector3.one);
-                // initiate walking animation (SPECTATORS Walk)
-                AnimateSpectators(AnimationType.March, Vector3.one);
-                // move group to the target location (GROUP move to transform 1)
-                AddAnimationToQueue(AnimationType.MoveSquad, targetLocationList[1].position);
-                AddAnimationToQueue(AnimationType.WaitForCue, Vector3.one);
-                // rotate to face the team's king 
+                // Rotate group to first orientation and go there
+                AnimateWaypointTraversal(1, 0);
+                // rotate to face the team's king and pause
                 AnimateSpectators(AnimationType.Rotate, gameControlScript.playerScripts[0].kingSquadScript.transform.position - targetLocationList[0].position);
                 AnimateSpectators(AnimationType.Cue, Vector3.one);
-                // pause for a duration (SPECTATOR idle, group delay)
                 AnimateSpectators(AnimationType.Idle, Vector3.one);
-                AnimateSpectators(AnimationType.WaitForCue, Vector3.one);
-                delayValue = UnityEngine.Random.Range(5, 10);
-                AddAnimationToQueue(AnimationType.Delay, Vector3.one * delayValue);
-                // initiate walk animation (SPECTATOR walk)
-                AddAnimationToQueue(AnimationType.Cue, Vector3.one * 3);
-                AddAnimationToQueue(AnimationType.WaitForCue, Vector3.one);
-                //rotate to look at the other king
+                AnimationDelay(UnityEngine.Random.Range(5, 10));
+                //rotate to look at the other king and pause
                 AnimateSpectators(AnimationType.Rotate, gameControlScript.playerScripts[1].kingSquadScript.transform.position - targetLocationList[0].position);
                 AnimateSpectators(AnimationType.Cue, Vector3.one);
-                // pause for a duration (SPECTATOR idle, group delay)
                 AnimateSpectators(AnimationType.Idle, Vector3.one);
-                AnimateSpectators(AnimationType.WaitForCue, Vector3.one);
-                delayValue = UnityEngine.Random.Range(4, 12);
-                AddAnimationToQueue(AnimationType.Delay, Vector3.one * delayValue);
-                // initiate walk animation (SPECTATOR walk)
-                AddAnimationToQueue(AnimationType.Cue, Vector3.one * 3);
-                AddAnimationToQueue(AnimationType.WaitForCue, Vector3.one);
-                // rotate to look at original position (SPECTATORS look at transform 0)
-                AnimateSpectators(AnimationType.Rotate, targetLocationList[1].position - targetLocationList[1].position);
-                AnimateSpectators(AnimationType.Cue, Vector3.one);
-                AnimateSpectators(AnimationType.March, Vector3.one);
-                // move group to new location (GROUP move to transform 0)
-                AddAnimationToQueue(AnimationType.MoveSquad, targetLocationList[1].position);
-                AddAnimationToQueue(AnimationType.WaitForCue, Vector3.one);
-                // rotate to starting angle (SPECTATOR align with orientation of transform 0)
+                AnimationDelay(UnityEngine.Random.Range(4, 12));
+                // return to starting position                 
+                AnimateWaypointTraversal(0, 1);
+                // rotate to starting angle
                 AnimateSpectators(AnimationType.Rotate, targetLocationList[1].forward);
-                // return to idle animation (SPECTATOR Idle)
                 AnimateSpectators(AnimationType.Cue, Vector3.one);
                 AnimateSpectators(AnimationType.Idle, Vector3.one);
                 //report animation complete.
@@ -153,47 +121,22 @@ public class SpectatorGroupScript : MonoBehaviour
 
             case SpectatorAnimation.WanderingKnights:
                 // the attacker knights move down the right side of the board, face their king, pause, then return and face board center
-                // Rotate group to first orientation
                 AddAnimationToQueue(AnimationType.WaitForCue, Vector3.one);
-                AnimateSpectators(AnimationType.Rotate, targetLocationList[1].position - targetLocationList[0].position);
-                AnimateSpectators(AnimationType.Cue, Vector3.one);
-                // initiate walking animation (SPECTATORS Walk)
-                AnimateSpectators(AnimationType.March, Vector3.one);
-                // move group to the target location (GROUP move to transform 1)
-                AddAnimationToQueue(AnimationType.MoveSquad, targetLocationList[1].position);
-                AddAnimationToQueue(AnimationType.WaitForCue, Vector3.one);
-                // rotate to face the team's king 
+                //move to location 1, next to the board
+                AnimateWaypointTraversal(0, 1);
+                // rotate to face the team's king, then pause
                 AnimateSpectators(AnimationType.Rotate, gameControlScript.playerScripts[0].kingSquadScript.transform.position - targetLocationList[1].position);
                 AnimateSpectators(AnimationType.Cue, Vector3.one);
-                // pause for a duration (SPECTATOR idle, group delay)
                 AnimateSpectators(AnimationType.Idle, Vector3.one);
-                AnimateSpectators(AnimationType.WaitForCue, Vector3.one);
-                delayValue = UnityEngine.Random.Range(5, 12);
-                AddAnimationToQueue(AnimationType.Delay, Vector3.one * delayValue);
-                // initiate walk animation (SPECTATOR walk)
-                AddAnimationToQueue(AnimationType.Cue, Vector3.one * 3);
-                AddAnimationToQueue(AnimationType.WaitForCue, Vector3.one);
-                //rotate to look at the other king
+                AnimationDelay(UnityEngine.Random.Range(5, 12));
+                //rotate to look at the other king and pause
                 AnimateSpectators(AnimationType.Rotate, gameControlScript.playerScripts[1].kingSquadScript.transform.position - targetLocationList[1].position);
                 AnimateSpectators(AnimationType.Cue, Vector3.one);
-                // pause for a duration (SPECTATOR idle, group delay)
                 AnimateSpectators(AnimationType.Idle, Vector3.one);
-                AnimateSpectators(AnimationType.WaitForCue, Vector3.one);
-                delayValue = UnityEngine.Random.Range(4, 15);
-                AddAnimationToQueue(AnimationType.Delay, Vector3.one * delayValue);
-                // initiate spectator rotation and wait for cue to move group.
-                AddAnimationToQueue(AnimationType.Cue, Vector3.one * 3);
-                AddAnimationToQueue(AnimationType.WaitForCue, Vector3.one);
-                // rotate to look at original position (SPECTATORS look at transform 0)
-                for (int x = 1; x < targetLocationList.Count; x++)
-                {
-                    AnimateSpectators(AnimationType.Rotate, targetLocationList[(x + 1) % targetLocationList.Count].position - targetLocationList[x].position);
-                    AnimateSpectators(AnimationType.Cue, Vector3.one);
-                    AnimateSpectators(AnimationType.March, Vector3.one);
-                    AddAnimationToQueue(AnimationType.MoveSquad, targetLocationList[(x + 1) % targetLocationList.Count].position);
-                    AddAnimationToQueue(AnimationType.WaitForCue, Vector3.one);
-                }
-                // rotate to starting angle (SPECTATOR align with orientation of transform 0)
+                AnimationDelay(UnityEngine.Random.Range(4, 15));
+                // walk forward through all waypoints, back to starting location
+                AnimateWaypointTraversal(1, targetLocationList.Count);
+                // rotate to starting angle 
                 AnimateSpectators(AnimationType.Rotate, targetLocationList[0].forward);
                 // return to idle animation (SPECTATOR Idle)
                 AnimateSpectators(AnimationType.Cue, Vector3.one);
@@ -204,38 +147,20 @@ public class SpectatorGroupScript : MonoBehaviour
 
             case SpectatorAnimation.HeavyInfantryVsArchers:
                 // EVENT 3: a pair of heavy infantry invaders advance up the right side of the board, then stop and defend. 
-                // a group of defender archers approach from the castle side and fire on them. 
-                // defenders block, with spark effect 
+                // a group of defender archers approach from the castle side and fire on them. defenders block, with spark effect 
                 // all units return to their original positions. 
                 if (spectatorClass == SoldierClass.HeavyInfantry)
                 {
                     AddAnimationToQueue(AnimationType.WaitForCue, Vector3.one);
-                    for (int x = 0; x < targetLocationList.Count - 1; x++)
-                    {
-                        AnimateSpectators(AnimationType.Rotate, targetLocationList[(x + 1) % targetLocationList.Count].position - targetLocationList[x].position);
-                        AnimateSpectators(AnimationType.Cue, Vector3.one);
-                        AnimateSpectators(AnimationType.March, Vector3.one);
-                        AddAnimationToQueue(AnimationType.MoveSquad, targetLocationList[(x + 1) % targetLocationList.Count].position);
-                        AddAnimationToQueue(AnimationType.WaitForCue, Vector3.one);
-                    }
+                    AnimateWaypointTraversal(0, targetLocationList.Count - 1);
                     //stand in place anbd block until attacked
                     AnimateSpectators(AnimationType.Block, Vector3.one);
-                    //go to idle animation and wait 1 second, as if considering pressing the attack
+                    //go to idle animation and wait, as if considering pressing the attack
                     AnimateSpectators(AnimationType.Idle, Vector3.one);
                     AnimateSpectators(AnimationType.Cue, Vector3.one);
-                    AnimateSpectators(AnimationType.WaitForCue, Vector3.one);
-                    AddAnimationToQueue(AnimationType.Delay, Vector3.one * 1.5f);
-                    // retreat
-                    AddAnimationToQueue(AnimationType.Cue, Vector3.one);
-                    AddAnimationToQueue(AnimationType.WaitForCue, Vector3.one);
-                    for (int x = targetLocationList.Count - 1; x > 0; x--)
-                    {
-                        AnimateSpectators(AnimationType.Rotate, targetLocationList[(x - 1) % targetLocationList.Count].position - targetLocationList[x].position);
-                        AnimateSpectators(AnimationType.Cue, Vector3.one);
-                        AnimateSpectators(AnimationType.March, Vector3.one);
-                        AddAnimationToQueue(AnimationType.MoveSquad, targetLocationList[(x - 1) % targetLocationList.Count].position);
-                        AddAnimationToQueue(AnimationType.WaitForCue, Vector3.one);
-                    }
+                    AnimationDelay(1.5f);
+                    //return to starting point                 
+                    AnimateWaypointTraversal(targetLocationList.Count - 1, 0);
                     //face campfire
                     foreach (SpectatorScript spectator in spectatorList)
                     {
@@ -251,48 +176,22 @@ public class SpectatorGroupScript : MonoBehaviour
                 {
                     //end idle archery practice animation
                     HaltSpectators();
-                    //give the archer attack animation time to complete before proceeding with transition animations.
-                    //add additional time to allow the opposing HeavyInfantry group to proceed far enough down the field. 
-                    AnimateSpectators(AnimationType.WaitForCue, Vector3.one);
-                    AddAnimationToQueue(AnimationType.Delay, Vector3.one * 10);
-                    //tell the archers to begin rotation toward waypoint, and await cue saying rotation is complete
-                    AddAnimationToQueue(AnimationType.Cue, Vector3.one);
-                    AddAnimationToQueue(AnimationType.WaitForCue, Vector3.one);
+                    //small delay to finish prior animations and to sync with opponents
+                    AnimationDelay(10);
                     //traverse the waypoints.
-                    for (int x = 0; x < targetLocationList.Count - 1; x++)
-                    {
-                        ConsolePrint("Building archer walking animation queue..");
-                        AnimateSpectators(AnimationType.Rotate, targetLocationList[(x + 1) % targetLocationList.Count].position - targetLocationList[x].position);
-                        AnimateSpectators(AnimationType.Cue, Vector3.one);
-                        AnimateSpectators(AnimationType.March, Vector3.one);
-                        AddAnimationToQueue(AnimationType.MoveSquad, targetLocationList[(x + 1) % targetLocationList.Count].position);
-                        AddAnimationToQueue(AnimationType.WaitForCue, Vector3.one);
-                    }
-                    // pause for 2 seconds to ensure blocker animation is ready for deflect command
+                    AnimateWaypointTraversal(0, targetLocationList.Count - 1);
+                    // pause to ensure blocker animation is ready for deflect command
                     AnimateSpectators(AnimationType.Idle, Vector3.one);
                     AnimateSpectators(AnimationType.Cue, Vector3.one);
-                    AnimateSpectators(AnimationType.WaitForCue, Vector3.one);
-                    AddAnimationToQueue(AnimationType.Delay, Vector3.one * 2);
-                    // attack
-                    AddAnimationToQueue(AnimationType.Cue, Vector3.one);
-                    AddAnimationToQueue(AnimationType.WaitForCue, Vector3.one);
+                    AnimationDelay(2);
+                    //attack
                     AnimateSpectators(AnimationType.Attack, Vector3.one);
                     AnimateSpectators(AnimationType.Idle, Vector3.one);
                     //wait for defenders to give up and retreat
                     AnimateSpectators(AnimationType.Cue, Vector3.one);
-                    AnimateSpectators(AnimationType.WaitForCue, Vector3.one);
-                    AddAnimationToQueue(AnimationType.Delay, Vector3.one * 3);
+                    AnimationDelay(3);
                     // return to base
-                    AddAnimationToQueue(AnimationType.Cue, Vector3.one);
-                    AddAnimationToQueue(AnimationType.WaitForCue, Vector3.one);
-                    for (int x = targetLocationList.Count - 1; x > 0; x--)
-                    {
-                        AnimateSpectators(AnimationType.Rotate, targetLocationList[(x - 1) % targetLocationList.Count].position - targetLocationList[x].position);
-                        AnimateSpectators(AnimationType.Cue, Vector3.one);
-                        AnimateSpectators(AnimationType.March, Vector3.one);
-                        AddAnimationToQueue(AnimationType.MoveSquad, targetLocationList[(x - 1) % targetLocationList.Count].position);
-                        AddAnimationToQueue(AnimationType.WaitForCue, Vector3.one);
-                    }
+                    AnimateWaypointTraversal(targetLocationList.Count - 1, 0);
                     // Face archery range 
                     AnimateSpectators(AnimationType.Rotate, targetLocationList[0].forward);
                     // return to idle attack animation
@@ -305,37 +204,24 @@ public class SpectatorGroupScript : MonoBehaviour
                 break;
 
             case SpectatorAnimation.MercenariesVsInfantry:
-                // EVENT 4: a pair of mercenary Invaders move down the right side of the board. 
-                // a group of infantry defenders move up the right side of the board to the same point
+                // EVENT 4: a pair of mercenary Invaders and wandering infantry defenders to the right side of the board. 
                 // each group takes a turn blocking and being attacked. 
-                // no deaths result. 
                 // all units return to their positions. 
-                int attackDefendIterations= 3;
+                int attackDefendIterations = 3;
                 if (spectatorClass == SoldierClass.Mercenary)
                 {
-                    AnimateSpectators(AnimationType.WaitForCue, Vector3.one);
-                    AddAnimationToQueue(AnimationType.Delay, Vector3.one * 0.001f);
-                    AddAnimationToQueue(AnimationType.Cue, Vector3.one);
                     AddAnimationToQueue(AnimationType.WaitForCue, Vector3.one);
-                    for (int x = 0; x < targetLocationList.Count - 1; x++)
+                    //traverse the location list                    
+                    AnimateWaypointTraversal(0, targetLocationList.Count - 1);
+                    //perform attack/block cycles
+                    for (int x = 0; x < attackDefendIterations; x++)
                     {
-                        AnimateSpectators(AnimationType.Rotate, targetLocationList[(x + 1) % targetLocationList.Count].position - targetLocationList[x].position);
-                        AnimateSpectators(AnimationType.Cue, Vector3.one);
-                        AnimateSpectators(AnimationType.March, Vector3.one);
-                        AddAnimationToQueue(AnimationType.MoveSquad, targetLocationList[(x + 1) % targetLocationList.Count].position);
-                        AddAnimationToQueue(AnimationType.WaitForCue, Vector3.one);
-                    }
-                    
-                    for(int x = 0; x< attackDefendIterations; x++){
                         //block until counterattack is received
                         AnimateSpectators(AnimationType.Block, Vector3.one);
                         AnimateSpectators(AnimationType.Idle, Vector3.one);
-                        // delay 2 seconds to allow groups to complete animations and sync
+                        // delay to allow groups to complete animations and sync
                         AnimateSpectators(AnimationType.Cue, Vector3.one);
-                        AnimateSpectators(AnimationType.WaitForCue, Vector3.one);
-                        AddAnimationToQueue(AnimationType.Delay, Vector3.one * 3);
-                        AddAnimationToQueue(AnimationType.Cue, Vector3.one);
-                        AddAnimationToQueue(AnimationType.WaitForCue, Vector3.one);
+                        AnimationDelay(3);
                         // attack
                         AnimateSpectators(AnimationType.Attack, Vector3.one);
                         AnimateSpectators(AnimationType.Idle, Vector3.one);
@@ -343,20 +229,10 @@ public class SpectatorGroupScript : MonoBehaviour
 
                     //go to idle animation and wait a few seconds, standing in stalemate
                     AnimateSpectators(AnimationType.Cue, Vector3.one);
-                    AnimateSpectators(AnimationType.WaitForCue, Vector3.one);
-                    AddAnimationToQueue(AnimationType.Delay, Vector3.one * 1.5f);
+                    AnimationDelay(1.5f);
                     // retreat
-                    AddAnimationToQueue(AnimationType.Cue, Vector3.one);
-                    AddAnimationToQueue(AnimationType.WaitForCue, Vector3.one);
-                    for (int x = targetLocationList.Count - 1; x > 0; x--)
-                    {
-                        AnimateSpectators(AnimationType.Rotate, targetLocationList[(x - 1) % targetLocationList.Count].position - targetLocationList[x].position);
-                        AnimateSpectators(AnimationType.Cue, Vector3.one);
-                        AnimateSpectators(AnimationType.March, Vector3.one);
-                        AddAnimationToQueue(AnimationType.MoveSquad, targetLocationList[(x - 1) % targetLocationList.Count].position);
-                        AddAnimationToQueue(AnimationType.WaitForCue, Vector3.one);
-                    }
-                    //face weapon rack
+                    AnimateWaypointTraversal(targetLocationList.Count - 1, 0);
+                    //face weapon rack (rotation vector must be customized per spectator, not per group)
                     foreach (SpectatorScript spectator in spectatorList)
                     {
                         spectator.AddAnimationToQueue(AnimationType.Rotate, targetLocationList[0].position - spectator.transform.position);
@@ -369,27 +245,16 @@ public class SpectatorGroupScript : MonoBehaviour
                 }//mercenary animation queue 
                 else    //infantry
                 {
-                    AnimateSpectators(AnimationType.WaitForCue, Vector3.one);
-                    AddAnimationToQueue(AnimationType.Delay, Vector3.one * 1.75f);
-                    AddAnimationToQueue(AnimationType.Cue, Vector3.one);
-                    AddAnimationToQueue(AnimationType.WaitForCue, Vector3.one);
+                    AnimationDelay(1.75f);
                     //traverse the waypoints.
-                    for (int x = 1; x < targetLocationList.Count - 1; x++)
-                    {
-                        AnimateSpectators(AnimationType.Rotate, targetLocationList[(x + 1) % targetLocationList.Count].position - targetLocationList[x].position);
-                        AnimateSpectators(AnimationType.Cue, Vector3.one);
-                        AnimateSpectators(AnimationType.March, Vector3.one);
-                        AddAnimationToQueue(AnimationType.MoveSquad, targetLocationList[(x + 1) % targetLocationList.Count].position);
-                        AddAnimationToQueue(AnimationType.WaitForCue, Vector3.one);
-                    }
+                    AnimateWaypointTraversal(1, targetLocationList.Count - 1);
                     AnimateSpectators(AnimationType.Idle, Vector3.one);
-                    for(int x = 0; x< attackDefendIterations; x++){
+                    // perform attack/defend cycles
+                    for (int x = 0; x < attackDefendIterations; x++)
+                    {
                         // delay 2 seconds to allow groups to complete animations and sync
                         AnimateSpectators(AnimationType.Cue, Vector3.one);
-                        AnimateSpectators(AnimationType.WaitForCue, Vector3.one);
-                        AddAnimationToQueue(AnimationType.Delay, Vector3.one * 3f);
-                        AddAnimationToQueue(AnimationType.Cue, Vector3.one);
-                        AddAnimationToQueue(AnimationType.WaitForCue, Vector3.one);
+                        AnimationDelay(3f);
                         // attack
                         AnimateSpectators(AnimationType.Attack, Vector3.one);
                         AnimateSpectators(AnimationType.Idle, Vector3.one);
@@ -399,19 +264,9 @@ public class SpectatorGroupScript : MonoBehaviour
                     }
                     //wait for defenders to give up and retreat
                     AnimateSpectators(AnimationType.Cue, Vector3.one);
-                    AnimateSpectators(AnimationType.WaitForCue, Vector3.one);
-                    AddAnimationToQueue(AnimationType.Delay, Vector3.one * 3);
+                    AnimationDelay(3f);
                     // return to base
-                    AddAnimationToQueue(AnimationType.Cue, Vector3.one);
-                    AddAnimationToQueue(AnimationType.WaitForCue, Vector3.one);
-                    for (int x = targetLocationList.Count - 1; x > 1; x--)
-                    {
-                        AnimateSpectators(AnimationType.Rotate, targetLocationList[(x - 1) % targetLocationList.Count].position - targetLocationList[x].position);
-                        AnimateSpectators(AnimationType.Cue, Vector3.one);
-                        AnimateSpectators(AnimationType.March, Vector3.one);
-                        AddAnimationToQueue(AnimationType.MoveSquad, targetLocationList[(x - 1) % targetLocationList.Count].position);
-                        AddAnimationToQueue(AnimationType.WaitForCue, Vector3.one);
-                    }
+                    AnimateWaypointTraversal(targetLocationList.Count - 1, 1);
                     // Face the field
                     AnimateSpectators(AnimationType.Rotate, targetLocationList[0].forward);
                     // return to idle animation
@@ -533,12 +388,38 @@ public class SpectatorGroupScript : MonoBehaviour
         }//done moving
     } //MovementFrameUpdate
 
-    private void AnimationDelay( float duration){
+    /// <summary>
+    /// A canned set of animation instructions used when a spectator group needs to pause for a specified duration.
+    /// Handles cueing of group and spectators automatically
+    /// </summary>
+    private void AnimationDelay(float duration)
+    {
         AnimateSpectators(AnimationType.WaitForCue, Vector3.one);
         AddAnimationToQueue(AnimationType.Delay, Vector3.one * duration);
         AddAnimationToQueue(AnimationType.Cue, Vector3.one);
         AddAnimationToQueue(AnimationType.WaitForCue, Vector3.one);
     }
+
+    /// <summary>
+    /// A canned set of animation instructions used when a spectator group needs to move through a list of waypoints
+    /// </summary>
+    private void AnimateWaypointTraversal(int startingIndex, int endingIndex)
+    {
+        int increment = 1;
+        if (startingIndex > endingIndex)
+            increment = -1;
+
+        for (int x = startingIndex; x != endingIndex; x += increment)
+        {
+            AnimateSpectators(AnimationType.Rotate, targetLocationList[(x + increment) % targetLocationList.Count].position - targetLocationList[x].position);
+            AnimateSpectators(AnimationType.Cue, Vector3.one);
+            AnimateSpectators(AnimationType.March, Vector3.one);
+            AddAnimationToQueue(AnimationType.MoveSquad, targetLocationList[(x + increment) % targetLocationList.Count].position);
+            AddAnimationToQueue(AnimationType.WaitForCue, Vector3.one);
+        }
+    }
+
+
 
     /*********************
      * EXTERNAL TRIGGERS *
@@ -576,6 +457,8 @@ public class SpectatorGroupScript : MonoBehaviour
         foreach (SpectatorScript spectator in spectatorList)
             spectator.Deflect();
     }
+
+
 
     /*************
      * UTILITIES *

@@ -8,6 +8,7 @@ using UnityEngine;
 /// </summary>
 public class SpectatorControl : MonoBehaviour
 {
+    //private, but exposed to UI editor
     [SerializeField] private List<SpectatorScript> invaderList = new List<SpectatorScript>();
     [SerializeField] private List<SpectatorScript> defenderList = new List<SpectatorScript>();
     [SerializeField] private SpectatorGroupScript peasantGroup;
@@ -16,10 +17,14 @@ public class SpectatorControl : MonoBehaviour
     [SerializeField] private SpectatorGroupScript heavyInfantryGroup;
     [SerializeField] private SpectatorGroupScript archerGroup;
     [SerializeField] private SpectatorGroupScript mercenaryGroup;
+    [SerializeField] private GameControl gameControl;
 
-    private float randomEventTimer = 10;
+    //private
+    private float randomEventTimer = 1;
     private bool randomEventActive = false;
-    private int animatingGroups = 0;
+    private int animatingGroups = 10;
+
+
 
     /********************
      * BUILT-IN METHODS *
@@ -34,13 +39,14 @@ public class SpectatorControl : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        if (!randomEventActive)
+        if (!randomEventActive && gameControl.gamePhase == GamePhase.Active)
         {
             randomEventTimer -= Time.deltaTime;
             if (randomEventTimer < 0)
                 TriggerRandomEvent();
         }
     }
+
 
 
     /******************
@@ -57,7 +63,7 @@ public class SpectatorControl : MonoBehaviour
         randomEventTimer = Random.Range(15, 25);
         //Lock out further animation triggers until this one is reported complete
         randomEventActive = true;
-        SpectatorAnimation animation = SpectatorAnimation.MercenariesVsInfantry; //(SpectatorAnimation)Random.Range(0, System.Enum.GetValues(typeof(SpectatorAnimation)).Length);
+        SpectatorAnimation animation = (SpectatorAnimation)Random.Range(0, System.Enum.GetValues(typeof(SpectatorAnimation)).Length);
         switch (animation)
         {
             case SpectatorAnimation.TentWalk:
@@ -95,6 +101,7 @@ public class SpectatorControl : MonoBehaviour
     }//triggerRandomEvent
 
 
+
     /********************
      * EXTERNAL REPORTS *
      ********************/
@@ -109,6 +116,8 @@ public class SpectatorControl : MonoBehaviour
         if (animatingGroups == 0)
             randomEventActive = false;
     }
+
+
 
     /*************
      * UTILITIES *

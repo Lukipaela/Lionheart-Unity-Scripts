@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using Unity.VisualScripting;
 using UnityEngine;
 
 /// <summary>
@@ -119,10 +120,10 @@ public class SpectatorScript : CharacterScript
     /// </summary>
     public void AnimationCue()
     {
+        ConsolePrint("Cue received");
         if (animationState == AnimationState.WaitingForCue)
             currentAnimationTask = null;
     }
-
 
     /// <summary>
     /// Called when a loping animation is playing, in order to end that loop and proceed to somethign new.
@@ -163,6 +164,8 @@ public class SpectatorScript : CharacterScript
     public void Deflect()
     {
         ConsolePrint("Deflect called");
+        SoundFile soundEffect = parentGroupScript.GetClassSoundEffect(SFXType.Block);
+        StartCoroutine(PlaySound(soundFileToPlay: soundEffect, useRandomDelay: true, looping: false, triggerVocalEffect: false));
         sparkParticleSystem.Play();
         currentAnimationTask = null;
     }
@@ -183,7 +186,11 @@ public class SpectatorScript : CharacterScript
     /// </summary>
     public void AttackSoundPrimary()
     {
-        //ConsolePrint("AttackSoundPrimary animation event called");
+        if (currentAnimationTask != null && currentAnimationTask.animationType == AnimationType.Attack)
+        {
+            SoundFile soundEffect = parentGroupScript.GetClassSoundEffect(SFXType.AttackPrimary);
+            StartCoroutine(PlaySound(soundFileToPlay: soundEffect, useRandomDelay: true, looping: false, triggerVocalEffect: false));
+        }
     }
 
     /// <summary>
@@ -192,7 +199,11 @@ public class SpectatorScript : CharacterScript
     /// </summary>
     public void AttackSoundSecondary()
     {
-        //ConsolePrint("AttackSoundSecondary animation event called");
+        if (currentAnimationTask != null && currentAnimationTask.animationType == AnimationType.Attack)
+        {
+            SoundFile soundEffect = parentGroupScript.GetClassSoundEffect(SFXType.AttackSecondary);
+            StartCoroutine(PlaySound(soundFileToPlay: soundEffect, useRandomDelay: true, looping: false, triggerVocalEffect: false));
+        }
     }
 
     /// <summary>
@@ -201,12 +212,17 @@ public class SpectatorScript : CharacterScript
     /// </summary>
     public void AttackHit()
     {
-        if (isCaptain && currentAnimationTask != null && currentAnimationTask.animationType == AnimationType.Attack)
+        if (currentAnimationTask != null && currentAnimationTask.animationType == AnimationType.Attack)
         {
-            ConsolePrint("Reporting attack hit to group.");
-            parentGroupScript.ReportAttackHit();
-        }
-    }
+            SoundFile soundEffect = parentGroupScript.GetClassSoundEffect(SFXType.AttackHit);
+            StartCoroutine(PlaySound(soundFileToPlay: soundEffect, useRandomDelay: true, looping: false, triggerVocalEffect: false));
+            if (isCaptain)
+            {
+                ConsolePrint("Reporting attack hit to group.");
+                parentGroupScript.ReportAttackHit();
+            }//captain
+        }   //not idle attacking
+    }   //attackHit
 
     /// <summary>
     /// Called by the final frame of the Attack animation, to indicate that the attacker is now free to return to their home tile/stance.

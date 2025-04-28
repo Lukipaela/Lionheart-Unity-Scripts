@@ -51,7 +51,7 @@ public class GameControl : MonoBehaviour
 
         //start up the game
         if (GameSettings.gameMode == GameMode.QuickStart)
-            Invoke("QuickStart", 0.1f);
+            Invoke("QuickStart", 0.2f);
         else
             BeginArmyPlacement(activePlayerID);
 
@@ -122,6 +122,10 @@ public class GameControl : MonoBehaviour
         gamePhase = GamePhase.QuickStart;
         //disable the unit placement hud
         hudControlScript.HideSquadPlacementPanel();
+
+        //in quickstart mode, this code fires before GameSettings.Awake(), so some features need to be manually initialized.
+        if (GameSettings.armyRaces == null)
+            GameSettings.DefineArmies();
 
         int thisPlayerId = 0;
         // PLAYER 1 SETUP
@@ -249,7 +253,8 @@ public class GameControl : MonoBehaviour
         gamePhase = GamePhase.Active;
         cameraControlScript.SetCameraGamePhase("ActiveGame");
         //after both teams have been rendered, update their soldier's skin tones to match the team they belong to.
-        AssignTeamColors();
+        if (GameSettings.gameMode == GameMode.QuickStart)
+            AssignTeamColors();
         //tell player script to start
         playerScripts[activePlayerID].BeginTurn();
         //setup hud panel
@@ -927,7 +932,7 @@ public class GameControl : MonoBehaviour
             hudControlScript.PauseClicked();
         }//escape pressed
 
-        //CheckDebugCommands();
+        CheckDebugCommands();
 
     }//CheckKeyboardCommands
 
@@ -941,9 +946,12 @@ public class GameControl : MonoBehaviour
             orientation = "Left";
         }
         //define script parameters
-        newSquad.GetComponent<SquadScript>().DefineSquad(playerID, squadType, squadSize, orientation, boardTile);
+        SquadScript newSquadScript = newSquad.GetComponent<SquadScript>();
+        newSquadScript.DefineSquad(playerID, squadType, squadSize, orientation, boardTile, GameSettings.armyRaces[GameSettings.playerRaces[playerID]].armyColor);
+
         //tell the board tile that it is now occupied by this unit 
         boardTile.GetComponent<BoardTileScript>().PlaceSquad(newSquad);
+
         return newSquad;
     }
 
@@ -978,12 +986,7 @@ public class GameControl : MonoBehaviour
                 p2Units.Add(thisUnit);
         }
 
-
-        //in quickstart mode, this code fires before GameSettings.Awake(), so some features need to be manually initialized.
-        if (GameSettings.armyRaces == null)
-            GameSettings.DefineArmies();
-
-        //loop over each list and apply the team color to all child scripts of type 
+        //loop over each list and apply the team color to all child scripts of type UnitScript
         foreach (UnitScript thisUnit in p1Units)
         {
             thisUnit.SetColor(GameSettings.armyRaces[GameSettings.playerRaces[0]].armyColor);
@@ -1064,6 +1067,7 @@ public class GameControl : MonoBehaviour
         if (Input.GetKeyUp(KeyCode.F))
         {
             ConsolePrint("Start F response");
+            cameraControlScript.TogglePerspective();
             ConsolePrint("End F response");
 
         }

@@ -25,7 +25,7 @@ public abstract class CharacterScript : MonoBehaviour
     protected bool isDead = false;
 
     //debug
-    protected readonly bool enableDebugging = false;
+    protected readonly bool enableDebugging = true;
 
 
 
@@ -158,7 +158,8 @@ public abstract class CharacterScript : MonoBehaviour
     /// <param name="soundToPlay">The Audio Clip to be played.</param>
     /// <param name="useRandomDelay">Indicates if a small random delay should be imposed before playing the clip. 
     /// This helps prevent all members of the squad from playinmg the same sound at exactly the same moment, stacking the volume.</param>
-    /// <param name="loopTrack">Indicates if the sound should loop indefinitely (until explicitly cancelled by some other process).</param>
+    /// <param name="looping">Indicates if the sound should loop indefinitely (until explicitly cancelled by some other process).</param>
+    /// <param name="triggerVocalEffect">Indicates if the sound should trigger the "speaking" particle effect.</param>
     protected IEnumerator PlaySound(SoundFile soundFileToPlay, bool useRandomDelay, bool looping, bool triggerVocalEffect)
     {
         ConsolePrint("Playing track: " + soundFileToPlay.audioClip.name);

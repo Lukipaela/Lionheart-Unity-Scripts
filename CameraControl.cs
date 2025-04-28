@@ -4,14 +4,17 @@ using UnityEngine;
 
 public class CameraControl : MonoBehaviour
 {
-    public GameObject[] diceRollCameraLocations;
-    public GameObject[] activeGameCameraLocations;
-    public GameObject[] playerOneSetupCameraLocations;
-    public GameObject[] playerTwoSetupCameraLocations;
-    public GameObject mainCamera;
-    public GameObject castleFront;
-    public GameControl gameControlScript;
-    public GameObject combatCameraBox;
+    [SerializeField] private GameObject[] diceRollCameraLocations;
+    [SerializeField] private GameObject[] activeGameCameraLocations;
+    [SerializeField] private GameObject[] playerOneSetupCameraLocations;
+    [SerializeField] private GameObject[] playerTwoSetupCameraLocations;
+    [SerializeField] private GameObject orthoCamera;
+    [SerializeField] private GameObject perspectiveCamera;
+    [SerializeField] private GameObject cameraCollection;
+
+    [SerializeField] private GameObject castleFront;
+    [SerializeField] private GameControl gameControlScript;
+    [SerializeField] private GameObject combatCameraBox;
     public bool animating = false;
     public bool combatCameraActive = false;
 
@@ -24,11 +27,8 @@ public class CameraControl : MonoBehaviour
     private readonly float cameraMoveSpeed = 2;
     private readonly float cameraRotationSpeed = 2;
     private GameObject targetCamLocation;
-    private GameObject cameraTrackedObject = null;
-    private float cameraZoom_combat = 1;
-    private float cameraZoom_default = 3.5f;
 
-    private static readonly bool enableDebugging = true; //switch to enable/disable console logging for this script
+    private static readonly bool enableDebugging = false; //switch to enable/disable console logging for this script
 
 
     /********************
@@ -52,16 +52,34 @@ public class CameraControl : MonoBehaviour
      * CUSTOM METHODS *
      ******************/
 
+    /// <summary>
+    /// Enables the requested camera type, disables all others
+    /// </summary>
+    /// <param name="cameraType">CameraType which should be activated.</param>
+    private void SetActiveCamera(CameraType cameraType)
+    {
+        if (cameraType == CameraType.Orthographic)
+        {
+            orthoCamera.SetActive(true);
+            perspectiveCamera.SetActive(false);
+        }
+        else if (cameraType == CameraType.Perspective)
+        {
+            perspectiveCamera.SetActive(true);
+            orthoCamera.SetActive(false);
+        }
+    }
+
     private void MoveCamera()
     {
         if (!combatCameraActive)
         {
             ConsolePrint("Non Combat Camera Update");
             //standard camera rules of motion
-            if (Vector3.Angle(mainCamera.transform.forward, targetCamLocation.transform.forward) > 0.1f || Vector3.Distance(mainCamera.transform.position, targetCamLocation.transform.position) > 0.5)
+            if (Vector3.Angle(cameraCollection.transform.forward, targetCamLocation.transform.forward) > 0.1f || Vector3.Distance(cameraCollection.transform.position, targetCamLocation.transform.position) > 0.5)
             {
-                mainCamera.transform.rotation = Quaternion.Lerp(mainCamera.transform.rotation, targetCamLocation.transform.rotation, Time.deltaTime * cameraRotationSpeed);
-                mainCamera.transform.position = Vector3.Lerp(mainCamera.transform.position, targetCamLocation.transform.position, cameraMoveSpeed * Time.deltaTime);
+                cameraCollection.transform.rotation = Quaternion.Lerp(cameraCollection.transform.rotation, targetCamLocation.transform.rotation, Time.deltaTime * cameraRotationSpeed);
+                cameraCollection.transform.position = Vector3.Lerp(cameraCollection.transform.position, targetCamLocation.transform.position, cameraMoveSpeed * Time.deltaTime);
             }
             else
                 animating = false;
@@ -113,22 +131,23 @@ public class CameraControl : MonoBehaviour
         //this method switches the camera to perspective mode and moves it to the location of the active combatant
         combatCameraActive = true;
         animating = true;
-
-        //identify the object to be tracked by the camera
-        cameraTrackedObject = defender;
+        SetActiveCamera(CameraType.Perspective);
 
         //place the combat box based on the input location data 
         combatCameraBox.transform.position = attacker.transform.position;
         combatCameraBox.transform.rotation = attacker.transform.rotation;
         //directly relocate the camera to the combat box
-        mainCamera.transform.position = combatCameraBox.transform.GetChild(0).transform.position;
-        mainCamera.transform.rotation = combatCameraBox.transform.GetChild(0).transform.rotation;
+        cameraCollection.transform.position = combatCameraBox.transform.GetChild(0).transform.position;
+        //cameraCollection.transform.rotation = combatCameraBox.transform.GetChild(0).transform.rotation;
 
-        Quaternion angleToTarget = Quaternion.LookRotation((defender.transform.position + (attacker.transform.forward * 0.1f) + (attacker.transform.up * 0.6f)) - mainCamera.transform.position);
-        mainCamera.transform.rotation = angleToTarget;
+        //Quaternion angleToTarget = Quaternion.LookRotation((defender.transform.position + (attacker.transform.forward * 0.1f) + (attacker.transform.up * 0.6f)) - cameraCollection.transform.position);
+        Quaternion angleToTarget = Quaternion.LookRotation(((
+            (defender.transform.position + attacker.transform.position) * 0.5f) //the point halfway between attacker and defender
+            + (attacker.transform.up * 0.5f)) //offset vertically, since unit positions are at ground level
+            - (attacker.transform.forward * 0.4f) //since the camera is already above the attacker, shift the target from the middle between the two squads toward the attacker a little
+            - cameraCollection.transform.position);//subtract from camera's current location to form a vector from the camera to the above calculated location
+        cameraCollection.transform.rotation = angleToTarget;
 
-        //zoom camera in on action 
-        mainCamera.GetComponent<Camera>().orthographicSize = cameraZoom_combat;
     }//enable combat camera 
 
     public void DisableCombatCamera()
@@ -136,28 +155,20 @@ public class CameraControl : MonoBehaviour
         //this method switches the camera back to ortho mode and moves it to the active game camera location 
         combatCameraActive = false;
         animating = false;
-
-        //return camera to standard zoom
-        mainCamera.GetComponent<Camera>().orthographicSize = cameraZoom_default;
+        SetActiveCamera(CameraType.Orthographic);
 
         //return camera position to active game camera position
-        mainCamera.transform.position = activeGameCameraLocations[0].transform.position;
-        mainCamera.transform.rotation = activeGameCameraLocations[0].transform.rotation;
+        cameraCollection.transform.position = activeGameCameraLocations[0].transform.position;
+        cameraCollection.transform.rotation = activeGameCameraLocations[0].transform.rotation;
 
         //safety - reset the game phase flag in case it enters combat mode without that update having been done
         gamePhase = "ActiveGame";
 
     }//disable combat camera 
 
-
     /***************
      * DEBUG STUFF *
      ***************/
-
-    public void ToggleCameraProjection()
-    {
-        mainCamera.GetComponent<Camera>().orthographic = !mainCamera.GetComponent<Camera>().orthographic;
-    }
 
     public void ConsolePrint(string message)
     {
@@ -166,5 +177,14 @@ public class CameraControl : MonoBehaviour
             Debug.Log("Camera Control - " + message);
         }
     }//console print
+
+    public void TogglePerspective()
+    {
+        bool isOrtho = orthoCamera.activeSelf;
+        if (isOrtho)
+            SetActiveCamera(CameraType.Perspective);
+        else
+            SetActiveCamera(CameraType.Orthographic);
+    }
 
 }//class

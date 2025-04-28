@@ -30,7 +30,7 @@ public class SquadScript : MonoBehaviour
     private PlayerScript parentPlayerScript;
 
     //debug
-    private static readonly bool enableDebugging = false;
+    private static readonly bool enableDebugging = true;
 
 
 
@@ -242,6 +242,12 @@ public class SquadScript : MonoBehaviour
         }//switch squadtype
     }//GenerateAttackAnimationQueue
 
+    /// <summary>
+    /// Called by the squad animation queue to delegate a command to the individual units in the squad.
+    /// </summary>
+    /// <param name="soldiersToAnimate">How many of the units should perform the animation. if -1, then all remaining units will peroform the animation.</param>
+    /// <param name="animationType">Which animation type to add to the units' queues.</param>
+    /// <param name="animationVector">A vector associated with the animation. (A position or rotation vector normally).</param>
     public void AnimateSquad(int soldiersToAnimate, AnimationType animationType, Vector3 animationVector)
     {
         ConsolePrint("Animation " + animationType.ToString() + " requested for " + soldiersToAnimate + " units of type " + soldierClassAttributes.soldierClass);
@@ -741,7 +747,7 @@ public class SquadScript : MonoBehaviour
     /// <summary>
     /// Called immediately after instantiating a squad, as a pseudo-constructor method.
     /// </summary>
-    public void DefineSquad(int ownerID, SoldierClass squadType, int unitsInSquad, string facingDirection, GameObject location)
+    public void DefineSquad(int ownerID, SoldierClass squadType, int unitsInSquad, string facingDirection, GameObject location, Color teamColor)
     {
         //called after instantiation, to initialize the tile's parameters (type, count, etc)
         this.ownerID = ownerID;
@@ -759,6 +765,8 @@ public class SquadScript : MonoBehaviour
         UnitScript[] unitControlScriptArray = gameObject.GetComponentsInChildren<UnitScript>();
         unitList.AddRange(unitControlScriptArray);
         unitList[unitList.Count - 1].isCaptain = true;
+        foreach (UnitScript unit in unitList)
+            unit.SetColor(teamColor);
     }
 
     /// <summary>
@@ -779,24 +787,24 @@ public class SquadScript : MonoBehaviour
         return gameControlScript.playerScripts[ownerID];
     }
 
-    public SoundFile GetUnitSoundEffect(string SFXType)
+    public SoundFile GetUnitSoundEffect(SFXType sfxType)
     {
         SoundFile returnValue = null;
-        switch (SFXType)
+        switch (sfxType)
         {
-            case "AttackHit":
+            case SFXType.AttackHit:
                 returnValue = unitSFXLibrary.getAttackLandSound();
                 break;
-            case "AttackPrimary":
+            case SFXType.AttackPrimary:
                 returnValue = unitSFXLibrary.getAttackStartSound();
                 break;
-            case "AttackSecondary":
+            case SFXType.AttackSecondary:
                 returnValue = unitSFXLibrary.getAttackMidSound();
                 break;
-            case "Block":
+            case SFXType.Block:
                 returnValue = unitSFXLibrary.getBlockSound();
                 break;
-            case "Die":
+            case SFXType.Die:
                 if (soldierClassAttributes.soldierClass == SoldierClass.Infantry || soldierClassAttributes.soldierClass == SoldierClass.Archer || soldierClassAttributes.soldierClass == SoldierClass.Peasant)
                     returnValue = GameSettings.armyRaces[GameSettings.playerRaces[ownerID]].armyVoice.getSmallUnitDeathSound();
                 else if (soldierClassAttributes.soldierClass == SoldierClass.Knight || soldierClassAttributes.soldierClass == SoldierClass.HeavyInfantry || soldierClassAttributes.soldierClass == SoldierClass.Mercenary)
@@ -804,19 +812,19 @@ public class SquadScript : MonoBehaviour
                 else
                     returnValue = GameSettings.armyRaces[GameSettings.playerRaces[ownerID]].armyVoice.getKingDeathSound();
                 break;
-            case "Horse":
+            case SFXType.HorseDeath:
                 returnValue = GameSettings.armyRaces[GameSettings.playerRaces[ownerID]].armyVoice.getHorseDeathSound();
                 break;
-            case "Movement":
+            case SFXType.Movement:
                 returnValue = unitSFXLibrary.getMovementSound();
                 break;
-            case "Panic":
+            case SFXType.Panic:
                 if (soldierClassAttributes.soldierClass == SoldierClass.Infantry || soldierClassAttributes.soldierClass == SoldierClass.Archer || soldierClassAttributes.soldierClass == SoldierClass.Peasant)
                     returnValue = GameSettings.armyRaces[GameSettings.playerRaces[ownerID]].armyVoice.getSmallUnitPanicSound();
                 else
                     returnValue = GameSettings.armyRaces[GameSettings.playerRaces[ownerID]].armyVoice.getLargeUnitPanicSound();
                 break;
-            case "Selected":
+            case SFXType.Selected:
                 returnValue = GameSettings.armyRaces[GameSettings.playerRaces[ownerID]].armyVoice.getSelectedSound();
                 break;
         }

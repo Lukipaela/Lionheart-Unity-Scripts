@@ -9,7 +9,7 @@ public class UnitScript : CharacterScript
     [SerializeField] private SoldierClass unitClass;    //archer, knight, etc
 
     //debug - override CharacterScript logging at Unit level
-    new private readonly bool enableDebugging = false;
+    new private readonly bool enableDebugging = true;
 
 
     /********************
@@ -49,13 +49,13 @@ public class UnitScript : CharacterScript
                     else
                         animationState = AnimationState.Marching;
                     Animate(AnimationType.March);
-                    StartCoroutine(PlaySound(parentSquadScript.GetUnitSoundEffect("Movement"), useRandomDelay: false, looping: true, triggerVocalEffect: false));
+                    StartCoroutine(PlaySound(parentSquadScript.GetUnitSoundEffect(SFXType.Movement), useRandomDelay: false, looping: true, triggerVocalEffect: false));
                     break;
 
                 case AnimationType.Rotate:
                     animationState = AnimationState.Rotating;
                     Animate(AnimationType.March);
-                    StartCoroutine(PlaySound(parentSquadScript.GetUnitSoundEffect("Movement"), useRandomDelay: false, looping: true, triggerVocalEffect: false));
+                    StartCoroutine(PlaySound(parentSquadScript.GetUnitSoundEffect(SFXType.Movement), useRandomDelay: false, looping: true, triggerVocalEffect: false));
                     break;
 
                 case AnimationType.Attack:
@@ -102,11 +102,11 @@ public class UnitScript : CharacterScript
         Animate(AnimationType.Die);
         //if the death was that of a knight, also call a horse scream sound effect
         if (unitClass == SoldierClass.Knight)
-            StartCoroutine(PlaySound(parentSquadScript.GetUnitSoundEffect("Horse")
+            StartCoroutine(PlaySound(parentSquadScript.GetUnitSoundEffect(SFXType.HorseDeath)
                                         , useRandomDelay: true
                                         , looping: false
                                         , triggerVocalEffect: false));
-        StartCoroutine(PlaySound(parentSquadScript.GetUnitSoundEffect("Die")
+        StartCoroutine(PlaySound(parentSquadScript.GetUnitSoundEffect(SFXType.Die)
                                     , useRandomDelay: true
                                     , looping: false
                                     , triggerVocalEffect: false));
@@ -157,7 +157,7 @@ public class UnitScript : CharacterScript
     {
         ConsolePrint("Deflect called");
         sparkParticleSystem.Play();
-        SoundFile soundEffect = parentSquadScript.GetUnitSoundEffect("Block");
+        SoundFile soundEffect = parentSquadScript.GetUnitSoundEffect(SFXType.Block);
         StartCoroutine(PlaySound(soundFileToPlay: soundEffect, useRandomDelay: true, looping: false, triggerVocalEffect: false));
         currentAnimationTask = null;
     }
@@ -181,7 +181,7 @@ public class UnitScript : CharacterScript
     public void AttackSoundPrimary()
     {
         ConsolePrint("AttackSoundPrimary animation event called");
-        StartCoroutine(PlaySound(soundFileToPlay: parentSquadScript.GetUnitSoundEffect("AttackPrimary")
+        StartCoroutine(PlaySound(soundFileToPlay: parentSquadScript.GetUnitSoundEffect(SFXType.AttackPrimary)
                                     , useRandomDelay: true
                                     , looping: false
                                     , triggerVocalEffect: false));
@@ -189,7 +189,7 @@ public class UnitScript : CharacterScript
 
     public void AttackSoundSecondary()
     {
-        StartCoroutine(PlaySound(soundFileToPlay: parentSquadScript.GetUnitSoundEffect("AttackSecondary")
+        StartCoroutine(PlaySound(soundFileToPlay: parentSquadScript.GetUnitSoundEffect(SFXType.AttackSecondary)
                                     , useRandomDelay: true
                                     , looping: false
                                     , triggerVocalEffect: false));
